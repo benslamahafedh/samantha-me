@@ -49,17 +49,18 @@ export async function POST(req: NextRequest) {
     try {
       completion = await openai.chat.completions.create({
         model: 'gpt-4',
-        messages: messages as any,
+        messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
         temperature: 0.7,
         max_tokens: 80, // Much shorter responses
         presence_penalty: 0.3,
         frequency_penalty: 0.2,
       });
-    } catch (gpt4Error: any) {
-      console.log('GPT-4 failed, trying GPT-3.5-turbo:', gpt4Error.message);
+    } catch (gpt4Error: unknown) {
+      const errorMessage = gpt4Error instanceof Error ? gpt4Error.message : 'Unknown error';
+      console.log('GPT-4 failed, trying GPT-3.5-turbo:', errorMessage);
               completion = await openai.chat.completions.create({
           model: 'gpt-3.5-turbo',
-          messages: messages as any,
+          messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
           temperature: 0.7,
           max_tokens: 80, // Much shorter responses
           presence_penalty: 0.3,
@@ -74,19 +75,20 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ response });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('OpenAI API error:', error);
     
     // Provide more specific error messages
-    if (error.status === 401) {
+    const errorObj = error as { status?: number; message?: string };
+    if (errorObj.status === 401) {
       return NextResponse.json({ error: 'Invalid OpenAI API key' }, { status: 500 });
-    } else if (error.status === 429) {
+    } else if (errorObj.status === 429) {
       return NextResponse.json({ error: 'OpenAI API rate limit exceeded' }, { status: 500 });
-    } else if (error.status === 402) {
+    } else if (errorObj.status === 402) {
       return NextResponse.json({ error: 'OpenAI API quota exceeded' }, { status: 500 });
     } else {
       return NextResponse.json({ 
-        error: `OpenAI API error: ${error.message || 'Unknown error'}` 
+        error: `OpenAI API error: ${errorObj.message || 'Unknown error'}` 
       }, { status: 500 });
     }
   }

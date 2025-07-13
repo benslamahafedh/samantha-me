@@ -42,7 +42,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
               </h2>
               
               <p className="text-gray-600 font-light mb-6 leading-relaxed">
-                I'm sorry, but I've encountered an unexpected error. Please try refreshing the page or check your browser's console for more details.
+                I&apos;m sorry, but I&apos;ve encountered an unexpected error. Please try refreshing the page or check your browser&apos;s console for more details.
               </p>
               
               <button

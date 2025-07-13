@@ -42,8 +42,8 @@ export default function VoiceManager({
   
   const processingRef = useRef(false);
   const lastProcessedTranscript = useRef('');
-  const sessionTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const sessionTimerRef = useRef<number | null>(null);
+  const countdownIntervalRef = useRef<number | null>(null);
   const sessionStartTimeRef = useRef<number | null>(null);
   const timeLeftRef = useRef(60);
   const sessionEndedRef = useRef(false);
@@ -142,83 +142,83 @@ export default function VoiceManager({
     console.log('🛑 SESSION COMPLETELY TERMINATED');
   }, [speechRecognition, textToSpeech, onSessionEndedChange]);
 
-  // BULLETPROOF TIMER SYSTEM - Multiple layers of protection
-  const startBulletproofTimer = useCallback(() => {
-    console.log('🔴 BULLETPROOF TIMER STARTING - 60 seconds countdown');
+  // SIMPLE AND RELIABLE TIMER - Using window.setInterval for maximum compatibility
+  const startSimpleTimer = useCallback(() => {
+    console.log('🔴 SIMPLE TIMER STARTING - 60 seconds countdown');
     
     // Clear any existing timers
-    if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
-    if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
+    if (sessionTimerRef.current) {
+      clearTimeout(sessionTimerRef.current);
+      sessionTimerRef.current = null;
+    }
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
+    }
     
-    const startTime = Date.now();
-    sessionStartTimeRef.current = startTime;
-    setSessionStartTime(startTime);
+    // Reset state
+    sessionEndedRef.current = false;
+    setSessionEnded(false);
+    setTimeLeft(60);
+    onSessionTimeChange?.(60);
     
-    // SIMPLE AND RELIABLE: Single timer that updates every second
-    let secondsElapsed = 0;
+    let secondsLeft = 60;
     
-    countdownIntervalRef.current = setInterval(() => {
-      if (sessionEndedRef.current) {
-        console.log('⏹️ Timer stopped - session already ended');
-        return;
-      }
+    // Simple countdown using window.setInterval
+    const intervalId = window.setInterval(() => {
+      secondsLeft--;
       
-      secondsElapsed++;
-      const remaining = Math.max(0, 60 - secondsElapsed);
-      timeLeftRef.current = remaining;
+      console.log(`⏱️ SIMPLE TIMER: ${secondsLeft}s remaining`);
       
-      console.log(`⏱️ TIMER TICK: ${remaining}s remaining (elapsed: ${secondsElapsed}s)`);
+      // Update state
+      setTimeLeft(secondsLeft);
+      onSessionTimeChange?.(secondsLeft);
       
-      // Update UI
-      setTimeLeft(remaining);
-      onSessionTimeChange?.(remaining);
-      
-      // Final countdown warning
-      if (remaining <= 10) {
-        console.log(`⚠️ FINAL COUNTDOWN: ${remaining} seconds left!`);
+      // Final countdown
+      if (secondsLeft <= 10) {
+        console.log(`⚠️ FINAL COUNTDOWN: ${secondsLeft} seconds left!`);
       }
       
       // Terminate when time is up
-      if (remaining <= 0) {
-        console.log('🛑 TIMER EXPIRED - TERMINATING NOW');
+      if (secondsLeft <= 0) {
+        console.log('🛑 SIMPLE TIMER EXPIRED - TERMINATING NOW');
+        window.clearInterval(intervalId);
         forceTerminateSession();
       }
     }, 1000);
     
-    // Backup timer (exactly 60 seconds)
-    sessionTimerRef.current = setTimeout(() => {
+    // Store interval ID
+    countdownIntervalRef.current = intervalId;
+    
+    // Backup timer (60 seconds)
+    sessionTimerRef.current = window.setTimeout(() => {
       console.log('🛑 BACKUP TIMER TRIGGERED - FORCE TERMINATION');
+      window.clearInterval(intervalId);
       forceTerminateSession();
     }, 60000);
     
-    // Emergency timer (65 seconds - absolute fallback)
-    setTimeout(() => {
-      if (!sessionEndedRef.current) {
-        console.log('🚨 EMERGENCY TIMER - NUCLEAR OPTION');
-        forceTerminateSession();
-      }
-    }, 65000);
+    console.log('✅ SIMPLE TIMER STARTED SUCCESSFULLY');
     
   }, [forceTerminateSession, onSessionTimeChange]);
 
   // Session timer - 1 minute limit (simplified)
   useEffect(() => {
     // Only start timer if we haven't already
-    if (hasStarted && !sessionEnded && !sessionStartTime && !countdownIntervalRef.current) {
-      console.log('🟢 STARTING BULLETPROOF SESSION TIMER');
-      startBulletproofTimer();
+    if (hasStarted && !sessionEnded && !countdownIntervalRef.current) {
+      console.log('🟢 STARTING SIMPLE SESSION TIMER');
+      startSimpleTimer();
     }
     
     return () => {
       // Cleanup on unmount
       if (sessionTimerRef.current) {
-        clearTimeout(sessionTimerRef.current);
+        window.clearTimeout(sessionTimerRef.current);
       }
       if (countdownIntervalRef.current) {
-        clearInterval(countdownIntervalRef.current);
+        window.clearInterval(countdownIntervalRef.current);
       }
     };
-  }, [hasStarted, sessionEnded, sessionStartTime, startBulletproofTimer]);
+  }, [hasStarted, sessionEnded, startSimpleTimer]);
 
   // Debug session state changes
   useEffect(() => {
@@ -246,13 +246,13 @@ export default function VoiceManager({
         // If timer should be running but isn't, restart it
         if (!countdownIntervalRef.current && !sessionEndedRef.current) {
           console.log('🚨 TIMER MISSING - RESTARTING NOW');
-          startBulletproofTimer();
+          startSimpleTimer();
         }
       }, 5000);
       
       return () => clearInterval(timerCheck);
     }
-  }, [hasStarted, sessionEnded, timeLeft, startBulletproofTimer]);
+  }, [hasStarted, sessionEnded, timeLeft, startSimpleTimer]);
 
   // Notify parent of session ended changes
   useEffect(() => {
@@ -397,7 +397,7 @@ export default function VoiceManager({
     // TEST: Force timer to start immediately
     setTimeout(() => {
       console.log('🧪 TESTING TIMER - Starting bulletproof timer now');
-      startBulletproofTimer();
+      startSimpleTimer();
     }, 100);
     
     // Start immediately when button is clicked
