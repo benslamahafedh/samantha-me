@@ -1,11 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-interface SpeechRecognitionResult {
-  transcript: string;
-  confidence: number;
-  isFinal: boolean;
-}
-
 interface UseSpeechRecognitionReturn {
   transcript: string;
   interimTranscript: string;
@@ -45,7 +39,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
       try {
         (recognitionRef.current as unknown as SpeechRecognition).abort();
         recognitionRef.current = null;
-      } catch (e) {
+      } catch {
         // Ignore cleanup errors
       }
     }
@@ -140,11 +134,11 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
 
         try {
           (recognitionRef.current as unknown as SpeechRecognition).start();
-        } catch (_err) {
+        } catch {
           setError('Failed to start speech recognition');
           setIsListening(false);
         }
-      } catch (_setupError) {
+      } catch {
         setError('Failed to initialize speech recognition');
         setIsListening(false);
       }
@@ -163,7 +157,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
       }
       setIsListening(false);
       setError(null); // Clear any errors when manually stopping
-    } catch (_e) {
+    } catch {
       // Ignore errors during cleanup
       setIsListening(false);
     }
@@ -215,17 +209,17 @@ declare global {
     start(): void;
     stop(): void;
     abort(): void;
-    onaudioend: ((this: SpeechRecognition, ev: Event) => any) | null;
-    onaudiostart: ((this: SpeechRecognition, ev: Event) => any) | null;
-    onend: ((this: SpeechRecognition, ev: Event) => any) | null;
-    onerror: ((this: SpeechRecognition, ev: { error: string }) => any) | null;
-    onnomatch: ((this: SpeechRecognition, ev: Event) => any) | null;
-    onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
-    onsoundend: ((this: SpeechRecognition, ev: Event) => any) | null;
-    onsoundstart: ((this: SpeechRecognition, ev: Event) => any) | null;
-    onspeechend: ((this: SpeechRecognition, ev: Event) => any) | null;
-    onspeechstart: ((this: SpeechRecognition, ev: Event) => any) | null;
-    onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+    onaudioend: ((this: SpeechRecognition, ev: Event) => unknown) | null;
+    onaudiostart: ((this: SpeechRecognition, ev: Event) => unknown) | null;
+    onend: ((this: SpeechRecognition, ev: Event) => unknown) | null;
+    onerror: ((this: SpeechRecognition, ev: { error: string }) => unknown) | null;
+    onnomatch: ((this: SpeechRecognition, ev: Event) => unknown) | null;
+    onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => unknown) | null;
+    onsoundend: ((this: SpeechRecognition, ev: Event) => unknown) | null;
+    onsoundstart: ((this: SpeechRecognition, ev: Event) => unknown) | null;
+    onspeechend: ((this: SpeechRecognition, ev: Event) => unknown) | null;
+    onspeechstart: ((this: SpeechRecognition, ev: Event) => unknown) | null;
+    onstart: ((this: SpeechRecognition, ev: Event) => unknown) | null;
   }
   interface SpeechRecognitionEvent extends Event {
     readonly resultIndex: number;

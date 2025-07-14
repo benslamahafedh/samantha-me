@@ -155,7 +155,7 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
       };
 
       speechSynthesis.speak(utterance);
-    } catch (err) {
+    } catch {
       setError('Failed to synthesize speech');
       setIsSpeaking(false);
     }
@@ -167,7 +167,7 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
         speechSynthesis.cancel();
         setIsSpeaking(false);
         setError(null); // Clear any errors when manually stopping
-      } catch (e) {
+      } catch {
         // Ignore errors during cancellation
         setIsSpeaking(false);
       }
