@@ -23,7 +23,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<unknown>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isSupported = typeof window !== 'undefined' && 
@@ -43,7 +43,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
     // Clean up any existing recognition
     if (recognitionRef.current) {
       try {
-        recognitionRef.current.abort();
+        (recognitionRef.current as any).abort();
         recognitionRef.current = null;
       } catch (e) {
         // Ignore cleanup errors
@@ -56,16 +56,16 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         recognitionRef.current = new SpeechRecognition();
 
-        recognitionRef.current.continuous = true;
-        recognitionRef.current.interimResults = true;
-        recognitionRef.current.lang = 'en-US';
+        (recognitionRef.current as any).continuous = true;
+        (recognitionRef.current as any).interimResults = true;
+        (recognitionRef.current as any).lang = 'en-US';
 
-        recognitionRef.current.onstart = () => {
+        (recognitionRef.current as any).onstart = () => {
           setIsListening(true);
           setError(null);
         };
 
-        recognitionRef.current.onresult = (event: any) => {
+        (recognitionRef.current as any).onresult = (event: any) => {
           let interimTranscript = '';
           let finalTranscript = '';
 
@@ -91,13 +91,13 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
           }
           timeoutRef.current = setTimeout(() => {
             if (recognitionRef.current && isListening) {
-              recognitionRef.current.stop();
+              (recognitionRef.current as any).stop();
               setTimeout(() => startListening(), 500);
             }
           }, 6000); // Balanced 6 seconds - not too short, not too long
         };
 
-        recognitionRef.current.onerror = (event: any) => {
+        (recognitionRef.current as any).onerror = (event: any) => {
           // Handle specific errors more gracefully
           if (event.error === 'aborted') {
             // Don't show error for aborted - it's usually intentional
@@ -134,12 +134,12 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
           }, 2000);
         };
 
-        recognitionRef.current.onend = () => {
+        (recognitionRef.current as any).onend = () => {
           setIsListening(false);
         };
 
         try {
-          recognitionRef.current.start();
+          (recognitionRef.current as any).start();
         } catch (err) {
           setError('Failed to start speech recognition');
           setIsListening(false);
@@ -154,7 +154,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
   const stopListening = useCallback(() => {
     try {
       if (recognitionRef.current) {
-        recognitionRef.current.abort(); // Use abort instead of stop for cleaner shutdown
+        (recognitionRef.current as any).abort(); // Use abort instead of stop for cleaner shutdown
         recognitionRef.current = null;
       }
       if (timeoutRef.current) {
@@ -177,7 +177,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        (recognitionRef.current as any).stop();
       }
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -200,7 +200,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
 // Extend the Window interface to include speech recognition
 declare global {
   interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
+    SpeechRecognition: unknown;
+    webkitSpeechRecognition: unknown;
   }
 } 

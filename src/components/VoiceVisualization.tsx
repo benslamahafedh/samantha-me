@@ -997,7 +997,7 @@ export default function VoiceVisualization({
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
                 </svg>
-                <span className="font-medium">I'm Done Speaking</span>
+                <span className="font-medium">I&apos;m Done Speaking</span>
               </motion.button>
             </motion.div>
                      )}
@@ -1128,7 +1128,7 @@ export default function VoiceVisualization({
             >
               <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-4 sm:p-6 shadow-soft-rose border border-white/10">
                 <p className="text-white/90 font-light text-center leading-relaxed text-sm sm:text-base">
-                  "{transcript}"
+                  &quot;{transcript}&quot;
                 </p>
               </div>
             </motion.div>
