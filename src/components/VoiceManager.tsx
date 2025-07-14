@@ -412,7 +412,7 @@ export default function VoiceManager({
     setTimeout(() => {
       speechRecognition.startListening();
     }, 2500);
-  }, [hasStarted, speechRecognition, textToSpeech]);
+  }, [hasStarted, speechRecognition, textToSpeech, startSimpleTimer]);
 
   // Handle manual start from button
   useEffect(() => {
