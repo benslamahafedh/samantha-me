@@ -36,7 +36,6 @@ export default function VoiceManager({
   const [hasStarted, setHasStarted] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
   const [sessionEnded, setSessionEnded] = useState(false);
   const [timeLeft, setTimeLeft] = useState(60); // 60 seconds = 1 minute
   
@@ -44,7 +43,6 @@ export default function VoiceManager({
   const lastProcessedTranscript = useRef('');
   const sessionTimerRef = useRef<number | null>(null);
   const countdownIntervalRef = useRef<number | null>(null);
-  const sessionStartTimeRef = useRef<number | null>(null);
   const timeLeftRef = useRef(60);
   const sessionEndedRef = useRef(false);
 
@@ -225,12 +223,11 @@ export default function VoiceManager({
     console.log('📊 SESSION STATE CHANGE:', {
       hasStarted,
       sessionEnded,
-      sessionStartTime,
       timeLeft,
       timerActive: !!countdownIntervalRef.current,
       backupTimerActive: !!sessionTimerRef.current
     });
-  }, [hasStarted, sessionEnded, sessionStartTime, timeLeft]);
+  }, [hasStarted, sessionEnded, timeLeft]);
 
   // GLOBAL TIMER CHECK - Every 5 seconds, verify timer is running
   useEffect(() => {
@@ -277,7 +274,6 @@ export default function VoiceManager({
       sessionEnded,
       sessionEndedRef: sessionEndedRef.current,
       hasStarted,
-      sessionStartTime,
       timeLeft,
       timeLeftRef: timeLeftRef.current
     });
@@ -354,7 +350,7 @@ export default function VoiceManager({
       processingRef.current = false;
       setIsProcessing(false);
     }
-  }, [conversationHistory, textToSpeech, onError, sessionEnded, hasStarted, sessionStartTime, timeLeft, sessionEndedRef]);
+  }, [conversationHistory, textToSpeech, onError, sessionEnded, hasStarted, timeLeft, sessionEndedRef]);
 
   // Process transcript with better pause detection
   useEffect(() => {
@@ -492,7 +488,7 @@ export default function VoiceManager({
             Browser Not Supported
           </h2>
           <p className="text-white/70">
-            This browser doesn't support voice recognition or text-to-speech. 
+            This browser doesn&apos;t support voice recognition or text-to-speech. 
             Please use a modern browser like Chrome, Firefox, or Safari.
           </p>
         </div>
@@ -500,5 +496,5 @@ export default function VoiceManager({
     );
   }
 
-  return null; // This component manages state but doesn't render anything
+  return null; // This component manages state but doesn&apos;t render anything
 } 
