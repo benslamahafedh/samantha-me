@@ -43,7 +43,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
     // Clean up any existing recognition
     if (recognitionRef.current) {
       try {
-        (recognitionRef.current as any).abort();
+        (recognitionRef.current as unknown as SpeechRecognition).abort();
         recognitionRef.current = null;
       } catch (e) {
         // Ignore cleanup errors
@@ -56,16 +56,16 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         recognitionRef.current = new SpeechRecognition();
 
-        (recognitionRef.current as any).continuous = true;
-        (recognitionRef.current as any).interimResults = true;
-        (recognitionRef.current as any).lang = 'en-US';
+        (recognitionRef.current as unknown as SpeechRecognition).continuous = true;
+        (recognitionRef.current as unknown as SpeechRecognition).interimResults = true;
+        (recognitionRef.current as unknown as SpeechRecognition).lang = 'en-US';
 
-        (recognitionRef.current as any).onstart = () => {
+        (recognitionRef.current as unknown as SpeechRecognition).onstart = () => {
           setIsListening(true);
           setError(null);
         };
 
-        (recognitionRef.current as any).onresult = (event: any) => {
+        (recognitionRef.current as unknown as SpeechRecognition).onresult = (event: SpeechRecognitionEvent) => {
           let interimTranscript = '';
           let finalTranscript = '';
 
@@ -91,13 +91,13 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
           }
           timeoutRef.current = setTimeout(() => {
             if (recognitionRef.current && isListening) {
-              (recognitionRef.current as any).stop();
+              (recognitionRef.current as unknown as SpeechRecognition).stop();
               setTimeout(() => startListening(), 500);
             }
           }, 6000); // Balanced 6 seconds - not too short, not too long
         };
 
-        (recognitionRef.current as any).onerror = (event: any) => {
+        (recognitionRef.current as unknown as SpeechRecognition).onerror = (event: { error: string }) => {
           // Handle specific errors more gracefully
           if (event.error === 'aborted') {
             // Don't show error for aborted - it's usually intentional
@@ -134,17 +134,17 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
           }, 2000);
         };
 
-        (recognitionRef.current as any).onend = () => {
+        (recognitionRef.current as unknown as SpeechRecognition).onend = () => {
           setIsListening(false);
         };
 
         try {
-          (recognitionRef.current as any).start();
-        } catch (err) {
+          (recognitionRef.current as unknown as SpeechRecognition).start();
+        } catch (_err) {
           setError('Failed to start speech recognition');
           setIsListening(false);
         }
-      } catch (setupError) {
+      } catch (_setupError) {
         setError('Failed to initialize speech recognition');
         setIsListening(false);
       }
@@ -154,7 +154,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
   const stopListening = useCallback(() => {
     try {
       if (recognitionRef.current) {
-        (recognitionRef.current as any).abort(); // Use abort instead of stop for cleaner shutdown
+        (recognitionRef.current as unknown as SpeechRecognition).abort(); // Use abort instead of stop for cleaner shutdown
         recognitionRef.current = null;
       }
       if (timeoutRef.current) {
@@ -163,7 +163,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
       }
       setIsListening(false);
       setError(null); // Clear any errors when manually stopping
-    } catch (e) {
+    } catch (_e) {
       // Ignore errors during cleanup
       setIsListening(false);
     }
@@ -177,7 +177,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
   useEffect(() => {
     return () => {
       if (recognitionRef.current) {
-        (recognitionRef.current as any).stop();
+        (recognitionRef.current as unknown as SpeechRecognition).stop();
       }
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -200,7 +200,50 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
 // Extend the Window interface to include speech recognition
 declare global {
   interface Window {
-    SpeechRecognition: unknown;
-    webkitSpeechRecognition: unknown;
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+  // Only declare if not already present
+  var SpeechRecognition: {
+    prototype: SpeechRecognition;
+    new (): SpeechRecognition;
+  };
+  interface SpeechRecognition extends EventTarget {
+    continuous: boolean;
+    interimResults: boolean;
+    lang: string;
+    start(): void;
+    stop(): void;
+    abort(): void;
+    onaudioend: ((this: SpeechRecognition, ev: Event) => any) | null;
+    onaudiostart: ((this: SpeechRecognition, ev: Event) => any) | null;
+    onend: ((this: SpeechRecognition, ev: Event) => any) | null;
+    onerror: ((this: SpeechRecognition, ev: { error: string }) => any) | null;
+    onnomatch: ((this: SpeechRecognition, ev: Event) => any) | null;
+    onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+    onsoundend: ((this: SpeechRecognition, ev: Event) => any) | null;
+    onsoundstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+    onspeechend: ((this: SpeechRecognition, ev: Event) => any) | null;
+    onspeechstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+    onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  }
+  interface SpeechRecognitionEvent extends Event {
+    readonly resultIndex: number;
+    readonly results: SpeechRecognitionResultList;
+  }
+  interface SpeechRecognitionResultList {
+    readonly length: number;
+    item(index: number): SpeechRecognitionResult;
+    [index: number]: SpeechRecognitionResult;
+  }
+  interface SpeechRecognitionResult {
+    readonly isFinal: boolean;
+    readonly length: number;
+    item(index: number): SpeechRecognitionAlternative;
+    [index: number]: SpeechRecognitionAlternative;
+  }
+  interface SpeechRecognitionAlternative {
+    readonly transcript: string;
+    readonly confidence: number;
   }
 } 
