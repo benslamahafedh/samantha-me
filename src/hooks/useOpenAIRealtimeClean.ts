@@ -127,31 +127,11 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
 
   // Initialize audio recording using browser-compatible approach
   const startListening = useCallback(async () => {
-    if (isListening) {
-      return;
-    }
-
-    // Initialize connection if needed
-    if (!isConnected) {
-      await initializeWebSocket();
-    }
+    if (!isSupported || isListening) return;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          sampleRate: 44100,
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true
-        } 
-      });
-
-      // Use MediaRecorder for better browser compatibility
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus',
-        audioBitsPerSecond: 128000
-      });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
       
       const audioChunks: Blob[] = [];
       const recordingStartTime = Date.now();
@@ -163,8 +143,10 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
       };
       
       mediaRecorder.onstop = async () => {
+        console.log('🎤 Audio recording stopped, processing...');
+        
         if (audioChunks.length === 0) {
-          consecutiveSilentChunksRef.current += 1;
+          console.log('⚠️ No audio data recorded');
           return;
         }
         
@@ -172,18 +154,14 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
           // Combine all audio chunks
           const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
           
-          // Only process if we have substantial audio (> 1.5 seconds)
+          // Only process if we have substantial audio (> 1 second)
           const recordingDuration = Date.now() - recordingStartTime;
-          if (recordingDuration < 1500) {
-            consecutiveSilentChunksRef.current += 1;
+          if (recordingDuration < 1000) {
+            console.log('⚠️ Recording too short, ignoring');
             return;
           }
           
-          // Check if we've had too many silent chunks
-          if (consecutiveSilentChunksRef.current >= MAX_SILENT_CHUNKS) {
-            console.log('🔇 Too many silent chunks, skipping processing');
-            return;
-          }
+          console.log('🔄 Sending audio to Whisper for transcription...');
           
           // Send to Whisper API for transcription
           const formData = new FormData();
@@ -305,7 +283,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
       console.error('Failed to start listening');
       setError('Failed to start voice recognition');
     }
-  }, [isListening, isConnected, initializeWebSocket, isMeaningfulSpeech, MAX_SILENT_CHUNKS, PROCESSING_COOLDOWN, lastProcessingTimeRef, lastResponseRef, setIsProcessing, setTranscript, setError, setIsListening, setIsSpeaking, speakResponse, conversationHistoryRef, isProcessingRef]);
+  }, [isListening, isConnected, initializeWebSocket, isMeaningfulSpeech, MAX_SILENT_CHUNKS, PROCESSING_COOLDOWN, lastProcessingTimeRef, lastResponseRef, setIsProcessing, setTranscript, setError, setIsListening, speakResponse, conversationHistoryRef, isProcessingRef]);
 
   // Stop listening
   const stopListening = useCallback(() => {

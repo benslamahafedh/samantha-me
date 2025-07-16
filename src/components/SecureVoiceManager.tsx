@@ -219,7 +219,7 @@ export default function SecureVoiceManager({
         }, restartDelay);
       }
     }
-  }, [textToSpeech.isSpeaking, hasStarted, sessionEnded, realtimeVoice.isConnected, realtimeVoice.isListening, hasWalletAccess, isTrialActive, trialTimeLeft]);
+  }, [textToSpeech.isSpeaking, hasStarted, sessionEnded, realtimeVoice.isConnected, realtimeVoice.isListening, hasWalletAccess, isTrialActive, trialTimeLeft, MAX_CONVERSATION_TIME]);
 
   // Refs for manual start
   const onManualStartListeningRef = useRef(onManualStartListening);
@@ -389,6 +389,27 @@ export default function SecureVoiceManager({
   useEffect(() => {
     onRequirePaymentRef.current = onRequirePayment;
   });
+
+  // Set up session timer
+  useEffect(() => {
+    if (!hasStarted || sessionEnded) return;
+
+    const timer = setInterval(() => {
+      setSessionTimeLeft(prev => {
+        const newTime = prev - 1;
+        if (newTime <= 0) {
+          clearInterval(timer);
+          setSessionEnded(true);
+          onSessionEndedChange?.(true);
+          return 0;
+        }
+        onSessionTimeChange?.(newTime);
+        return newTime;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [hasStarted, sessionEnded, onSessionEndedChange, onSessionTimeChange, MAX_CONVERSATION_TIME, realtimeVoice]);
 
   // Don't render anything - this is a headless component
   return null;

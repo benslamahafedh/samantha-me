@@ -26,41 +26,15 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
     ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
 
   const startListening = useCallback(() => {
-    console.log('🎤 startListening called');
+    if (!isSupported || isListening) return;
     
-    if (!isSupported) {
-      console.log('❌ Speech recognition not supported');
-      setError('❌ Speech recognition is not supported in this browser. Please try Chrome, Firefox, or Edge for the best experience.');
-      return;
+    try {
+      startSpeechRecognition();
+    } catch (error) {
+      console.error('Failed to start speech recognition:', error);
+      setError('Failed to start voice recognition');
     }
-
-    // Prevent multiple instances - check if already listening OR starting
-    if (isListening || isStartingRef.current) {
-      console.log('⏭️ Already listening or starting, skipping');
-      return;
-    }
-
-    isStartingRef.current = true;
-
-    // First, explicitly request microphone permission
-    console.log('🔐 Requesting microphone permission...');
-    navigator.mediaDevices.getUserMedia({ audio: true })
-      .then(() => {
-        console.log('✅ Microphone permission granted');
-        startSpeechRecognition();
-      })
-      .catch((error) => {
-        console.log('❌ Microphone permission denied:', error);
-        isStartingRef.current = false;
-        if (error.name === 'NotAllowedError') {
-          setError('❌ Microphone access denied. Please click the microphone icon in your browser\'s address bar and allow access, then refresh the page.');
-        } else if (error.name === 'NotFoundError') {
-          setError('❌ No microphone found. Please check your microphone is connected and try again.');
-        } else {
-          setError('❌ Could not access microphone. Please check your browser settings and ensure you\'re using HTTPS.');
-        }
-      });
-  }, [isListening, isSupported]);
+  }, [isSupported, isListening, startSpeechRecognition]);
 
   const startSpeechRecognition = useCallback(() => {
     console.log('🧹 Cleaning up existing recognition');
@@ -232,24 +206,16 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
   }, [isSupported, isListening]);
 
   const stopListening = useCallback(() => {
+    if (!isSupported || !isListening) return;
+    
     try {
       if (recognitionRef.current) {
-        (recognitionRef.current as unknown as SpeechRecognition).abort(); // Use abort instead of stop for cleaner shutdown
-        recognitionRef.current = null;
+        recognitionRef.current.stop();
       }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      setIsListening(false);
-      setError(null); // Clear any errors when manually stopping
-      isStartingRef.current = false; // Reset starting flag
-    } catch {
-      // Ignore errors during cleanup
-      setIsListening(false);
-      isStartingRef.current = false;
+    } catch (error) {
+      console.error('Failed to stop speech recognition:', error);
     }
-  }, []);
+  }, [isSupported, isListening]);
 
   const resetTranscript = useCallback(() => {
     setTranscript('');
