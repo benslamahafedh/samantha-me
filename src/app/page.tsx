@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import VoiceManagerRealtime from '@/components/VoiceManagerRealtimeClean';
+import { useState, useCallback, useEffect } from 'react';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import SecureVoiceManager from '@/components/SecureVoiceManager';
 import VoiceVisualization from '@/components/VoiceVisualization';
 import PaymentModal from '@/components/PaymentModal';
-
-import { getSessionManager } from '@/lib/sessionManager';
+import WalletProvider from '@/components/WalletProvider';
 
 export default function Home() {
   const [transcript, setTranscript] = useState('');
@@ -18,62 +19,39 @@ export default function Home() {
   const [sessionTimeLeft, setSessionTimeLeft] = useState(180); // 3 minutes
   const [sessionEnded, setSessionEnded] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [isBlocked, setIsBlocked] = useState(false);
   const [manualStartListening, setManualStartListening] = useState<(() => void) | null>(null);
+  const [hasWalletAccess, setHasWalletAccess] = useState(false);
+  const [isTrialActive, setIsTrialActive] = useState(false);
 
-  // Check initial session state and set up timer updates
-  useEffect(() => {
-    console.log('📱 PAGE: Setting up session manager...');
-    const sessionManager = getSessionManager();
-    const sessionData = sessionManager.getSessionData();
-    
-    console.log('📱 PAGE: Initial session data:', sessionData);
-    
-    if (sessionData) {
-      // Check if user has already used their free time
-      if (!sessionData.isPaid && sessionData.totalTimeUsed >= 180) {
-        // Block access and redirect to session-ended page immediately
-        setIsBlocked(true);
-        console.log('🚫 User has exceeded free time - redirecting to session-ended page');
-        window.location.href = '/session-ended';
-        return;
-      } else {
-        const remaining = sessionManager.getRemainingFreeTime();
-        console.log('📱 PAGE: Setting initial time left:', remaining);
-        setSessionTimeLeft(remaining);
-        
-        // Double-check remaining time isn't negative or zero
-        if (remaining <= 0 && !sessionData.isPaid) {
-          setIsBlocked(true);
-          window.location.href = '/session-ended';
-          return;
-        }
-      }
-    } else {
-      console.log('📱 PAGE: No existing session data, starting fresh');
-      setSessionTimeLeft(180); // Reset to 3 minutes
+  // Wallet connection state
+  const { connected, connecting, wallet } = useWallet();
+
+  // Handle wallet connection errors
+  const handleWalletError = useCallback((error: any) => {
+    console.log('Wallet connection error:', error);
+    // Don't show error to user, just log it
+    // The wallet adapter will handle the error gracefully
+  }, []);
+
+  // Manual wallet connection function
+  const handleManualConnect = useCallback(async () => {
+    try {
+      console.log('Attempting manual wallet connection...');
+      // The wallet adapter will handle the connection
+    } catch (error) {
+      console.log('Manual connection failed:', error);
     }
+  }, []);
 
-    // Set up timer listener
-    const handleTimeUpdate = (timeLeft: number) => {
-      console.log('📱 PAGE: Direct timer update from session manager:', timeLeft);
-      setSessionTimeLeft(timeLeft);
-    };
+  // Check if wallet is available - client-side only to prevent hydration mismatch
+  const [isWalletAvailable, setIsWalletAvailable] = useState(false);
+  const [isClient, setIsClient] = useState(false);
 
-    const handleSessionEnd = () => {
-      console.log('📱 PAGE: Direct session end from session manager - redirecting');
-      // Immediately redirect to session-ended page instead of showing modal
-      window.location.href = '/session-ended';
-    };
-
-    sessionManager.onTimeUpdate(handleTimeUpdate);
-    sessionManager.onSessionEnd(handleSessionEnd);
-
-    return () => {
-      // Note: SessionManager doesn't have removeListener methods, 
-      // but it's destroyed when component unmounts
-      console.log('📱 PAGE: Cleaning up session manager listeners');
-    };
+  useEffect(() => {
+    setIsClient(true);
+    // Check for wallet availability on client side only
+    const hasWallet = !!(window as any).solana || !!(window as any).phantom || !!(window as any).solflare;
+    setIsWalletAvailable(hasWallet);
   }, []);
 
   const handleTranscriptChange = (newTranscript: string) => {
@@ -90,7 +68,6 @@ export default function Home() {
 
   const handleError = (errorMessage: string) => {
     setError(errorMessage);
-    // Clear error after 5 seconds
     setTimeout(() => setError(null), 5000);
   };
 
@@ -102,135 +79,150 @@ export default function Home() {
     setIsReady(ready);
   };
 
-  const handleIntroComplete = () => {
-    console.log('🎬 Intro completed, showing orbit for manual start');
-    setIsIntroComplete(true);
-    // NO AUTO-START - Wait for user to click the orbit
-  };
-
   const handleSessionTimeChange = (timeLeft: number) => {
-    console.log('📱 PAGE: Received timer update:', timeLeft);
     setSessionTimeLeft(timeLeft);
   };
 
-  const handleSessionEndedChange = (ended: boolean) => {
-    console.log('📱 PAGE: Session ended:', ended);
-    setSessionEnded(ended);
+  const handleSessionEndedChange = (sessionEnded: boolean) => {
+    setSessionEnded(sessionEnded);
   };
 
   const handleRequirePayment = () => {
     setShowPaymentModal(true);
   };
 
-  const handleManualStartListening = useCallback((startFn: () => void) => {
+  const handlePaymentSuccess = () => {
+    setShowPaymentModal(false);
+    setSessionEnded(false);
+    // The SecureVoiceManager will automatically detect the payment and update access
+  };
+
+  const handleManualStartListening = (startFn: () => void) => {
     setManualStartListening(() => startFn);
+  };
+
+  const handleIntroComplete = useCallback(() => {
+    setIsIntroComplete(true);
   }, []);
 
-  // SIMPLIFIED MANUAL START - Called when user clicks orbit
-  const handleStartConversation = () => {
-    console.log('🌟 USER CLICKED ORBIT - Starting conversation');
-    
-    const sessionManager = getSessionManager();
-    
-    if (!sessionManager.canStartSession()) {
-      console.log('❌ Cannot start session - showing payment modal');
-      setShowPaymentModal(true);
-      return;
-    }
-
-    console.log('💫 Triggering voice conversation start');
-    
-    // Don't start session here - let VoiceManager handle it
-    // Just trigger the voice conversation event
-    console.log('🎤 Dispatching startConversation event');
+  const handleStartConversation = useCallback(() => {
     const event = new Event('startConversation');
     window.dispatchEvent(event);
-  };
+  }, []);
 
-  const handlePaymentSuccess = () => {
-    // Reset session state for unlimited access
-    setSessionEnded(false);
-    setSessionTimeLeft(Infinity);
-    setShowPaymentModal(false);
-    
-    // Reload to restart the assistant
-    window.location.reload();
-  };
+  const handleAccessStatusChange = useCallback((hasAccess: boolean, trialActive: boolean) => {
+    setHasWalletAccess(hasAccess);
+    setIsTrialActive(trialActive);
+  }, []);
 
   return (
-    <main className="min-h-screen gradient-rose-pink relative overflow-hidden">
-      {/* Background effects */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-0 -left-4 w-96 h-96 bg-rose-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
-        <div className="absolute top-0 -right-4 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
-      </div>
+    <WalletProvider>
+      <main className="relative min-h-screen overflow-hidden">
+        <div className="relative min-h-screen">
+          <VoiceVisualization
+            isListening={isListening}
+            isSpeaking={isSpeaking}
+            transcript={transcript}
+            error={error}
+            hasStarted={hasStarted}
+            isReady={isReady}
+            isIntroComplete={isIntroComplete}
+            onIntroComplete={handleIntroComplete}
+            onStartConversation={handleStartConversation}
+            sessionTimeLeft={sessionTimeLeft}
+            sessionEnded={sessionEnded}
+          />
+          
+          <SecureVoiceManager
+            onSpeakingChange={handleSpeakingChange}
+            onListeningChange={handleListeningChange}
+            onHasStartedChange={handleHasStartedChange}
+            onIsReadyChange={handleIsReadyChange}
+            onSessionTimeChange={handleSessionTimeChange}
+            onSessionEndedChange={handleSessionEndedChange}
+            onRequirePayment={handleRequirePayment}
+            onManualStartListening={handleManualStartListening}
+            onAccessStatusChange={handleAccessStatusChange}
+          />
+        </div>
 
-      {/* Main content */}
-      <div className="relative z-10">
-        {!isBlocked ? (
-          <>
-            <VoiceVisualization
-              isListening={isListening}
-              isSpeaking={isSpeaking}
-              transcript={transcript}
-              error={error}
-              hasStarted={hasStarted}
-              isReady={isReady}
-              isIntroComplete={isIntroComplete}
-              onIntroComplete={handleIntroComplete}
-              onStartConversation={handleStartConversation}
-              sessionTimeLeft={sessionTimeLeft}
-              sessionEnded={sessionEnded}
-            />
-            
-                    <VoiceManagerRealtime
-          onTranscriptChange={handleTranscriptChange}
-          onSpeakingChange={handleSpeakingChange}
-          onListeningChange={handleListeningChange}
-          onError={handleError}
-          onHasStartedChange={handleHasStartedChange}
-          onIsReadyChange={handleIsReadyChange}
-          onSessionTimeChange={handleSessionTimeChange}
-          onSessionEndedChange={handleSessionEndedChange}
-          onRequirePayment={handleRequirePayment}
-          onManualStartListening={handleManualStartListening}
+        {/* Payment Modal */}
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onPaymentSuccess={handlePaymentSuccess}
         />
-          </>
-        ) : (
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="text-white text-center">
-              <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-white mx-auto mb-4"></div>
-              <p>Redirecting to session page...</p>
+
+        {/* Session timer display - only for trial users */}
+        {hasStarted && !sessionEnded && isTrialActive && sessionTimeLeft < 999999 && sessionTimeLeft > 0 && (
+          <div className="fixed top-4 right-4 z-20">
+            <div className="bg-black/30 backdrop-blur-sm rounded-full px-4 py-2 border border-white/10">
+              <div className="flex items-center space-x-2">
+                <div className={`w-2 h-2 rounded-full ${sessionTimeLeft <= 30 ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
+                <span className="text-white/80 text-sm font-light">
+                  {Math.floor(sessionTimeLeft / 60)}:{(sessionTimeLeft % 60).toString().padStart(2, '0')}
+                </span>
+              </div>
             </div>
           </div>
         )}
-      </div>
 
-      {/* Payment Modal */}
-      <PaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        onPaymentSuccess={handlePaymentSuccess}
-      />
-
-      {/* Session timer display */}
-      {hasStarted && !sessionEnded && sessionTimeLeft !== Infinity && (
-        <div className="fixed top-4 right-4 z-20">
-          <div className="bg-black/30 backdrop-blur-sm rounded-full px-4 py-2 border border-white/10">
-            <div className="flex items-center space-x-2">
-              <div className={`w-2 h-2 rounded-full ${sessionTimeLeft <= 30 ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
-              <span className="text-white/80 text-sm font-light">
-                {Math.floor(sessionTimeLeft / 60)}:{(sessionTimeLeft % 60).toString().padStart(2, '0')}
-              </span>
+        {/* Unlimited access indicator for paid users */}
+        {hasStarted && !sessionEnded && hasWalletAccess && (
+          <div className="fixed top-4 right-4 z-20">
+            <div className="bg-gradient-to-r from-rose-500/20 to-pink-500/20 backdrop-blur-sm rounded-full px-4 py-2 border border-rose-500/30">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></div>
+                <span className="text-rose-200 text-sm font-light">
+                  Unlimited
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
+        {/* Wallet status indicator */}
+        {isClient && hasStarted && (
+          <div className="fixed bottom-4 right-4 z-20">
+            <div className="bg-black/30 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10">
+              <div className="flex items-center space-x-2 text-white/60 text-xs">
+                <div className={`w-2 h-2 rounded-full ${hasWalletAccess ? 'bg-green-400' : connected ? 'bg-blue-400' : 'bg-yellow-400'}`}></div>
+                <span>
+                  {hasWalletAccess ? 'Verified Payment' : connected ? 'Wallet Connected' : isTrialActive ? 'Trial Active' : 'Connect Wallet'}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
+        {/* Development mode indicator */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-20">
+            <div className="bg-yellow-500/20 backdrop-blur-sm rounded-full px-3 py-1 border border-yellow-500/30">
+              <span className="text-yellow-200 text-xs font-medium">DEV MODE</span>
+            </div>
+          </div>
+        )}
 
+        {/* Wallet connection button - only show when not connected and not in trial */}
+        {isClient && !connected && !isTrialActive && !hasWalletAccess && isWalletAvailable && (
+          <div className="fixed top-4 left-4 z-20">
+            <WalletMultiButton className="!bg-gradient-to-r !from-rose-500 !to-pink-500 !text-white !border !border-white/20 !rounded-full !px-4 !py-2 !text-sm !font-medium hover:!from-rose-600 hover:!to-pink-600 transition-all duration-300" />
+          </div>
+        )}
 
-    </main>
+        {/* Wallet not available message */}
+        {isClient && !connected && !isTrialActive && !hasWalletAccess && !isWalletAvailable && (
+          <div className="fixed top-4 left-4 z-20">
+            <div className="bg-black/30 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10">
+              <div className="flex items-center space-x-2 text-white/60 text-xs">
+                <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
+                <span>Install Phantom or Solflare wallet</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </WalletProvider>
   );
-}
+} 

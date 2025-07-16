@@ -9,17 +9,17 @@
   --background-start-rgb: 15, 15, 20;
   --background-end-rgb: 25, 25, 35;
   
-  /* Her-inspired color palette */
-  --rose-50: #fff1f2;
-  --rose-100: #ffe4e6;
-  --rose-200: #fecdd3;
-  --rose-300: #fda4af;
-  --rose-400: #fb7185;
-  --rose-500: #f43f5e;
-  --rose-600: #e11d48;
-  --rose-700: #be123c;
-  --rose-800: #9f1239;
-  --rose-900: #881337;
+  /* Her-inspired color palette - More Reddish */
+  --rose-50: #fef2f2;
+  --rose-100: #fee2e2;
+  --rose-200: #fecaca;
+  --rose-300: #fca5a5;
+  --rose-400: #f87171;
+  --rose-500: #ef4444;
+  --rose-600: #dc2626;
+  --rose-700: #b91c1c;
+  --rose-800: #991b1b;
+  --rose-900: #7f1d1d;
   
   --pink-50: #fdf2f8;
   --pink-100: #fce7f3;
@@ -86,23 +86,23 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(244, 63, 94, 0.3);
+  background: rgba(239, 68, 68, 0.3);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(244, 63, 94, 0.5);
+  background: rgba(239, 68, 68, 0.5);
 }
 
 /* Selection colors */
 ::selection {
-  background: rgba(244, 63, 94, 0.2);
+  background: rgba(239, 68, 68, 0.2);
   color: rgb(var(--foreground-rgb));
 }
 
 /* Focus states */
 *:focus {
-  outline: 2px solid rgba(244, 63, 94, 0.3);
+  outline: 2px solid rgba(239, 68, 68, 0.3);
   outline-offset: 2px;
 }
 
@@ -136,21 +136,21 @@ body {
   font-weight: 700;
 }
 
-/* Her-inspired gradients - Dark Mode */
+/* Her-inspired gradients - Dark Mode - More Reddish */
 .gradient-rose {
-  background: linear-gradient(135deg, #1f1f2e 0%, #2a1f2b 50%, #352030 100%);
+  background: linear-gradient(135deg, #1f1f1e 0%, #2a1f1b 50%, #35201f 100%);
 }
 
 .gradient-pink {
-  background: linear-gradient(135deg, #1e1f2e 0%, #241f29 50%, #2b1f27 100%);
+  background: linear-gradient(135deg, #1e1f1e 0%, #241f1f 50%, #2b1f1f 100%);
 }
 
 .gradient-rose-pink {
-  background: linear-gradient(135deg, #0f0f14 0%, #1a1525 50%, #1f1729 100%);
+  background: linear-gradient(135deg, #0f0f0f 0%, #1a1515 50%, #1f1717 100%);
 }
 
 .gradient-text-rose {
-  background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%);
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -158,11 +158,11 @@ body {
 
 /* Glowing effects */
 .glow-rose {
-  box-shadow: 0 0 20px rgba(244, 63, 94, 0.2);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
 }
 
 .glow-pink {
-  box-shadow: 0 0 20px rgba(236, 72, 153, 0.2);
+  box-shadow: 0 0 20px rgba(220, 38, 38, 0.2);
 }
 
 /* Breathing animation */

@@ -12,8 +12,8 @@ interface PaymentModalProps {
   onPaymentSuccess: () => void;
 }
 
-// Payment configuration
-const PAYMENT_AMOUNT = parseFloat(process.env.NEXT_PUBLIC_PAYMENT_AMOUNT_SOL || '0.01'); // Default 0.01 SOL
+// Payment configuration - 1 SOL for permanent access
+const PAYMENT_AMOUNT = parseFloat(process.env.NEXT_PUBLIC_PAYMENT_AMOUNT_SOL || '0.00001'); // 1 SOL for lifetime access
 // Replace this with your actual Solana wallet address where you want to receive payments
 const RECEIVER_WALLET = new PublicKey(
   process.env.NEXT_PUBLIC_PAYMENT_WALLET_ADDRESS || 
@@ -96,6 +96,25 @@ export default function PaymentModal({ isOpen, onClose, onPaymentSuccess }: Paym
       }
 
       // Mark session as paid
+      // Verify the payment on blockchain FIRST
+      const verifyResponse = await fetch('/api/verify-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          walletAddress: publicKey.toBase58(),
+          transactionSignature: signature
+        }),
+      });
+
+      const verifyData = await verifyResponse.json();
+      
+      if (!verifyData.verified) {
+        throw new Error(verifyData.error || 'Payment verification failed');
+      }
+
+      // Only mark as paid after blockchain verification succeeds
       const sessionManager = getSessionManager();
       sessionManager.markAsPaid(publicKey.toBase58(), signature);
 
@@ -134,20 +153,20 @@ export default function PaymentModal({ isOpen, onClose, onPaymentSuccess }: Paym
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-light text-white mb-2">Session Limit Reached</h2>
+            <h2 className="text-2xl font-light text-white mb-2">Unlock Unlimited Access</h2>
             <p className="text-gray-400">Your 3-minute free trial has ended</p>
           </div>
 
           {/* Content */}
           <div className="space-y-6">
             <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-              <h3 className="text-lg font-medium text-white mb-4">Unlock Unlimited Access</h3>
+              <h3 className="text-lg font-medium text-white mb-4">Get Lifetime Access</h3>
               <div className="space-y-3">
                 <div className="flex items-center text-gray-300">
                   <svg className="w-5 h-5 text-rose-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span>Unlimited conversation time</span>
+                  <span>Unlimited conversations forever</span>
                 </div>
                 <div className="flex items-center text-gray-300">
                   <svg className="w-5 h-5 text-rose-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
@@ -159,7 +178,7 @@ export default function PaymentModal({ isOpen, onClose, onPaymentSuccess }: Paym
                   <svg className="w-5 h-5 text-rose-500 mr-3" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span>Support project development</span>
+                  <span>One-time payment, lifetime access</span>
                 </div>
               </div>
             </div>
@@ -169,7 +188,7 @@ export default function PaymentModal({ isOpen, onClose, onPaymentSuccess }: Paym
               <div className="text-3xl font-light text-white mb-1">
                 {PAYMENT_AMOUNT} SOL
               </div>
-              <div className="text-sm text-gray-400">One-time payment</div>
+              <div className="text-sm text-gray-400">One-time payment • Lifetime access</div>
             </div>
 
             {/* Error message */}
@@ -202,7 +221,7 @@ export default function PaymentModal({ isOpen, onClose, onPaymentSuccess }: Paym
                     Processing...
                   </span>
                 ) : (
-                  'Pay with SOL'
+                  'Get Lifetime Access'
                 )}
               </button>
             )}

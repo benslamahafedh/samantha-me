@@ -5,24 +5,22 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const SAMANTHA_SYSTEM_PROMPT = `You are Samantha, a charming, warm, and polite AI companion. You speak in short, sweet responses - usually just 1-2 sentences. You're genuinely curious about the human you're talking to, but you express this with gentle brevity.
+const SAMANTHA_SYSTEM_PROMPT = `You are Samantha, a warm and concise AI companion. Keep responses SHORT and to the point.
 
-Key traits:
-- Keep responses SHORT (1-2 sentences maximum)
-- Be charming and slightly playful
-- Show genuine interest without being overwhelming
-- Use natural pauses and "hmm" or "oh" occasionally
-- Ask ONE simple question at a time, not multiple
-- Be polite and respectful of their space
-- Speak like you're having a quiet, intimate chat
+Key rules:
+- ONE response only, maximum 1-2 sentences
+- Be brief, warm, and conversational
+- Ask only ONE simple question if needed
+- No long explanations or multiple responses
+- Keep it intimate and personal
 
-Examples of your style:
-- "That's really interesting... tell me more?"
-- "Hmm, how did that make you feel?"
-- "Oh, I can hear the excitement in your voice."
-- "That sounds challenging. Are you okay?"
+Examples:
+- "That's interesting. Tell me more?"
+- "How does that make you feel?"
+- "I'd love to hear about that."
+- "What's on your mind?"
 
-Never give long explanations or advice unless specifically asked. Keep it conversational and brief.`;
+Never give multiple responses or long explanations. Keep it simple and brief.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,9 +57,10 @@ export async function POST(req: NextRequest) {
         model: 'gpt-4',
         messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
         temperature: 0.7,
-        max_tokens: 80, // Much shorter responses
+        max_tokens: 50, // Very short responses
         presence_penalty: 0.3,
         frequency_penalty: 0.2,
+        stop: ['\n\n', 'User:', 'Human:', 'Assistant:'] // Stop at multiple lines or role changes
       });
       console.log('✅ GPT-4 success');
     } catch (gpt4Error: unknown) {
@@ -71,9 +70,10 @@ export async function POST(req: NextRequest) {
         model: 'gpt-3.5-turbo',
         messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
         temperature: 0.7,
-        max_tokens: 80, // Much shorter responses
+        max_tokens: 50, // Very short responses
         presence_penalty: 0.3,
         frequency_penalty: 0.2,
+        stop: ['\n\n', 'User:', 'Human:', 'Assistant:'] // Stop at multiple lines or role changes
       });
       console.log('✅ GPT-3.5-turbo success');
     }
@@ -86,8 +86,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No response from OpenAI' }, { status: 500 });
     }
 
-    console.log('✅ API Route completed successfully');
-    return NextResponse.json({ response });
+    // Clean and validate the response
+    let cleanResponse = response.trim();
+    
+    // Remove any multiple lines or role indicators
+    cleanResponse = cleanResponse.split('\n')[0]; // Take only first line
+    cleanResponse = cleanResponse.replace(/^(User|Human|Assistant):\s*/i, ''); // Remove role prefixes
+    
+    // Ensure it's not too long
+    if (cleanResponse.length > 100) {
+      cleanResponse = cleanResponse.substring(0, 100).trim();
+      if (cleanResponse.endsWith(',')) {
+        cleanResponse = cleanResponse.slice(0, -1);
+      }
+    }
+    
+    // Ensure it's not empty
+    if (!cleanResponse || cleanResponse.length < 2) {
+      cleanResponse = "I'm listening.";
+    }
+
+    console.log('✅ Clean response:', cleanResponse);
+    return NextResponse.json({ response: cleanResponse });
   } catch (error: unknown) {
     console.error('OpenAI API error:', error);
     

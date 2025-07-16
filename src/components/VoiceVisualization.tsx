@@ -1007,46 +1007,6 @@ export default function VoiceVisualization({
          </AnimatePresence>
         )}
 
-        {/* Session Timer Display - Always visible when session is active */}
-        {hasStarted && !sessionEnded && (
-          <motion.div
-            className="fixed top-4 left-1/2 transform -translate-x-1/2 z-40"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.5 }}
-          >
-            <div className="bg-black/40 backdrop-blur-sm rounded-full px-4 py-2 border border-white/10">
-              <div className="flex items-center space-x-2">
-                <motion.div
-                  className={`w-2 h-2 rounded-full ${
-                    sessionTimeLeft <= 10 ? 'bg-red-400' : sessionTimeLeft <= 30 ? 'bg-yellow-400' : 'bg-rose-400'
-                  }`}
-                  animate={{
-                    scale: sessionTimeLeft <= 10 ? [1, 1.3, 1] : [1, 1.1, 1],
-                    opacity: sessionTimeLeft <= 10 ? [0.7, 1, 0.7] : [0.8, 1, 0.8]
-                  }}
-                  transition={{
-                    duration: sessionTimeLeft <= 10 ? 0.5 : 1,
-                    repeat: Infinity,
-                    ease: 'easeInOut'
-                  }}
-                />
-                <span className={`text-sm font-mono ${
-                  sessionTimeLeft <= 10 ? 'text-red-400' : sessionTimeLeft <= 30 ? 'text-yellow-400' : 'text-white/80'
-                }`}>
-                  {Math.floor(sessionTimeLeft / 60)}:{(sessionTimeLeft % 60).toString().padStart(2, '0')}
-                </span>
-                
-                {/* Debug display - remove this after fixing */}
-                <span className="text-xs text-white/30 ml-2">
-                  ({sessionTimeLeft}s)
-                </span>
-              </div>
-            </div>
-          </motion.div>
-        )}
-
         {/* Status Text - responsive - hidden when speaking OR listening */}
         {hasStarted && !isSpeaking && !isListening && !sessionEnded && (
         <motion.div

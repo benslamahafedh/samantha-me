@@ -189,61 +189,55 @@ export class SessionManager {
   }
 
   private startTimer(): void {
-    if (this.timerId) {
-      console.log(`🔄 SessionManager[${this.instanceId}]: Clearing existing timer`);
-      clearInterval(this.timerId);
+    // Don't start timer for users with permanent access
+    if (this.sessionData?.isPaid) {
+      return;
     }
 
-    console.log(`🟢 SessionManager[${this.instanceId}]: Starting timer`);
+    if (this.timerId) {
+      clearInterval(this.timerId);
+    }
     
-    // Add immediate test call
-    console.log(`🧪 SessionManager[${this.instanceId}]: Testing immediate updateSessionTime call`);
     this.updateSessionTime();
     
     this.timerId = setInterval(() => {
-      console.log(`🕐 SessionManager[${this.instanceId}]: setInterval callback triggered`);
       this.updateSessionTime();
     }, 1000);
-    
-    console.log(`⏰ SessionManager[${this.instanceId}]: Timer started with ID:`, this.timerId);
-    
-    // Test that timer is actually running
-    setTimeout(() => {
-      console.log(`🧪 SessionManager[${this.instanceId}]: Timer check after 2 seconds - ID:`, this.timerId);
-    }, 2000);
   }
 
   private updateSessionTime(): void {
     if (!this.sessionData) {
-      console.log(`❌ SessionManager[${this.instanceId}]: No session data in updateSessionTime`);
       return;
     }
 
     const now = Date.now();
     
+    // Only update timer for unpaid users
     if (!this.sessionData.isPaid) {
       this.sessionData.totalTimeUsed += 1;
       const timeLeft = Math.max(0, SESSION_DURATION - this.sessionData.totalTimeUsed);
-      
-      console.log(`⏰ SessionManager[${this.instanceId}]: Timer tick`, {
-        totalTimeUsed: this.sessionData.totalTimeUsed,
-        timeLeft,
-        listeners: this.onTimeUpdateCallbacks.length
-      });
       
       // Notify listeners
       this.onTimeUpdateCallbacks.forEach(cb => {
         try {
           cb(timeLeft);
         } catch (error) {
-          console.error(`❌ SessionManager[${this.instanceId}]: Error in time update callback:`, error);
+          // Ignore callback errors
         }
       });
       
       if (timeLeft <= 0) {
-        console.log(`🛑 SessionManager[${this.instanceId}]: Time expired, ending session`);
         this.endSession();
       }
+    } else {
+      // For paid users, notify listeners with infinite time
+      this.onTimeUpdateCallbacks.forEach(cb => {
+        try {
+          cb(Infinity);
+        } catch (error) {
+          // Ignore callback errors
+        }
+      });
     }
     
     this.sessionData.lastAccessTime = now;

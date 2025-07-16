@@ -25,6 +25,43 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const conversationHistoryRef = useRef<Array<{role: 'user' | 'assistant', content: string}>>([]);
   const isProcessingRef = useRef<boolean>(false);
+  const lastProcessedTranscriptRef = useRef<string>('');
+  const consecutiveSilentChunksRef = useRef<number>(0);
+  const lastProcessingTimeRef = useRef<number>(0);
+  const lastResponseRef = useRef<string>('');
+  const MAX_SILENT_CHUNKS = 3;
+  const PROCESSING_COOLDOWN = 2000; // 2 seconds between processing
+
+  // Helper function to check if text is meaningful
+  const isMeaningfulSpeech = useCallback((text: string): boolean => {
+    if (!text || text.trim().length < 3) return false;
+    
+    const cleanText = text.trim().toLowerCase();
+    
+    // Filter out common noise/background words
+    const noiseWords = [
+      'um', 'uh', 'hmm', 'ah', 'er', 'silence', 'noise', 'you', 'yeah', 'okay', 'so', 'like',
+      'background', 'static', 'feedback', 'echo', 'breathing', 'sigh', 'cough', 'clear throat'
+    ];
+    
+    // If it's just noise words, reject it
+    if (noiseWords.some(word => cleanText.includes(word)) && cleanText.length < 10) {
+      return false;
+    }
+    
+    // Reject if it's the same as last processed transcript
+    if (cleanText === lastProcessedTranscriptRef.current.toLowerCase()) {
+      return false;
+    }
+    
+    // Must have at least 2 different words
+    const words = cleanText.split(/\s+/).filter(word => word.length > 1);
+    if (words.length < 2) {
+      return false;
+    }
+    
+    return true;
+  }, []);
 
   const isSupported = typeof window !== 'undefined' && 
     'WebSocket' in window && 
@@ -126,6 +163,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
       
       mediaRecorder.onstop = async () => {
         if (audioChunks.length === 0) {
+          consecutiveSilentChunksRef.current += 1;
           return;
         }
         
@@ -133,9 +171,16 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
           // Combine all audio chunks
           const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
           
-          // Only process if we have substantial audio (> 1 second)
+          // Only process if we have substantial audio (> 1.5 seconds)
           const recordingDuration = Date.now() - recordingStartTime;
-          if (recordingDuration < 1000) {
+          if (recordingDuration < 1500) {
+            consecutiveSilentChunksRef.current += 1;
+            return;
+          }
+          
+          // Check if we've had too many silent chunks
+          if (consecutiveSilentChunksRef.current >= MAX_SILENT_CHUNKS) {
+            console.log('🔇 Too many silent chunks, skipping processing');
             return;
           }
           
@@ -155,7 +200,22 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
           const transcriptionData = await response.json();
           const transcribedText = transcriptionData.text?.trim();
           
-          if (transcribedText && transcribedText.length > 2) {
+          console.log('🎤 Transcribed:', transcribedText);
+          
+          // Check if this is meaningful speech
+          if (transcribedText && isMeaningfulSpeech(transcribedText)) {
+            console.log('✅ Meaningful speech detected, processing...');
+            
+            // Check cooldown
+            const timeSinceLastProcessing = Date.now() - lastProcessingTimeRef.current;
+            if (timeSinceLastProcessing < PROCESSING_COOLDOWN) {
+              console.log('⏸️ Processing cooldown active, skipping...');
+              return;
+            }
+            
+            consecutiveSilentChunksRef.current = 0;
+            lastProcessedTranscriptRef.current = transcribedText;
+            lastProcessingTimeRef.current = Date.now();
             setTranscript(transcribedText);
             
             // Add to conversation history
@@ -164,7 +224,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
               content: transcribedText
             });
             
-            // Process with GPT-4
+            // Process with GPT-4 (only if not already processing)
             if (!isProcessingRef.current) {
               setIsProcessing(true);
               isProcessingRef.current = true;
@@ -187,6 +247,14 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
 
                 const data = await response.json();
                 
+                // Check if this is a duplicate response
+                if (data.response === lastResponseRef.current) {
+                  console.log('🔄 Duplicate response detected, skipping...');
+                  return;
+                }
+                
+                lastResponseRef.current = data.response;
+                
                 conversationHistoryRef.current.push({
                   role: 'assistant',
                   content: data.response
@@ -202,10 +270,15 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
                 isProcessingRef.current = false;
               }
             }
+          } else {
+            console.log('🔇 Not meaningful speech, skipping processing');
+            consecutiveSilentChunksRef.current += 1;
           }
           
         } catch (err) {
+          console.error('Audio processing error:', err);
           setError('Failed to process voice input');
+          consecutiveSilentChunksRef.current += 1;
         }
         
         // Clear chunks for next recording
@@ -243,6 +316,10 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
   // Reset transcript
   const resetTranscript = useCallback(() => {
     setTranscript('');
+    lastProcessedTranscriptRef.current = '';
+    consecutiveSilentChunksRef.current = 0;
+    lastProcessingTimeRef.current = 0;
+    lastResponseRef.current = '';
   }, []);
 
   // Send a text message (for manual input)

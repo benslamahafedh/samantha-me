@@ -1,0 +1,19 @@
+{
+  "name": "Samantha Voice Assistant",
+  "short_name": "Samantha",
+  "description": "A beautiful voice-only AI assistant inspired by the movie 'Her'",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f0f14",
+  "theme_color": "#f43f5e",
+  "icons": [
+    {
+      "src": "/next.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "lang": "en",
+  "orientation": "portrait-primary"
+} 

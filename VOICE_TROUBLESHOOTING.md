@@ -18,11 +18,12 @@ Samantha is now a pure voice-only experience. Here's how it works:
 You speak (3 seconds) → Whisper transcription → GPT-4 processing → Samantha responds
 ```
 
-### ⏰ **Session Timer**
+### ⏰ **Session Management**
 
-- **3 minutes free** conversation time
-- Timer appears in the top-right corner when active
-- Pay for unlimited access when time expires
+- **3 minutes free** trial conversation time
+- Timer appears in the top-right corner during trial
+- **Pay 1 SOL once** for unlimited lifetime access
+- Paid users see "Unlimited" indicator instead of timer
 
 ### 🎨 **Visual Feedback**
 
@@ -52,6 +53,8 @@ You speak (3 seconds) → Whisper transcription → GPT-4 processing → Samanth
 - ✅ Clean, minimalist interface focused on voice interaction
 - ✅ Stable voice recognition using OpenAI Whisper
 - ✅ Automatic conversation flow
+- ✅ **One-time 1 SOL payment for lifetime access**
+- ✅ No more session limits for paid users
 - ✅ Production-ready experience
 
 ### 💫 **Experience Design**
