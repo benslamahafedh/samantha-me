@@ -14,158 +14,69 @@ interface UseOpenAIRealtimeReturn {
   sendMessage: (message: string) => Promise<void>;
 }
 
-interface RealtimeEvent {
-  type: string;
-  [key: string]: any;
-}
-
 export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
   const [isConnected, setIsConnected] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSupported, setIsSupported] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const currentTranscriptRef = useRef<string>('');
-  const conversationHistoryRef = useRef<Array<{role: 'user' | 'assistant', content: string}>>([]);
-  const isProcessingRef = useRef<boolean>(false);
+  const isProcessingRef = useRef(false);
 
-  const isSupported = typeof window !== 'undefined' && 
-    'WebSocket' in window && 
-    'MediaRecorder' in window;
+  // Check if WebSocket and MediaRecorder are supported
+  useEffect(() => {
+    setIsSupported(!!window.WebSocket && !!window.MediaRecorder);
+  }, []);
 
   // Initialize WebSocket connection to OpenAI Realtime API
   const initializeWebSocket = useCallback(async () => {
-    if (!isSupported) {
-      setError('WebSocket or MediaRecorder not supported in this browser');
-      return;
-    }
+    if (!isSupported) return;
 
     try {
-      const apiKeyResponse = await fetch('/api/get-api-key');
-      const { apiKey } = await apiKeyResponse.json();
-      
-      if (!apiKey) {
-        throw new Error('API key not available');
+      const response = await fetch('/api/get-api-key');
+      if (!response.ok) {
+        throw new Error('Failed to get API key');
       }
+      const { apiKey } = await response.json();
 
-      setIsConnected(true);
-      setError(null);
-    } catch (err) {
-      setError('Failed to initialize voice connection');
+      const ws = new WebSocket('wss://api.openai.com/v1/audio/speech');
+      
+      ws.onopen = () => {
+        console.log('🔗 WebSocket connected');
+        setIsConnected(true);
+        setError(null);
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('📨 WebSocket message:', data);
+        } catch {
+          console.log('📨 WebSocket binary data received');
+        }
+      };
+
+      ws.onerror = () => {
+        console.error('❌ WebSocket error');
+        setError('Connection failed');
+        setIsConnected(false);
+      };
+
+      ws.onclose = () => {
+        console.log('🔌 WebSocket closed');
+        setIsConnected(false);
+      };
+
+      wsRef.current = ws;
+    } catch {
+      console.error('Failed to initialize WebSocket');
+      setError('Failed to connect to voice service');
     }
   }, [isSupported]);
-
-  // Handle events from OpenAI Realtime API
-  const handleRealtimeEvent = useCallback((event: RealtimeEvent) => {
-    console.log('📡 Received event:', event.type);
-
-    switch (event.type) {
-      case 'conversation.item.input_audio_transcription.delta':
-        // Partial transcription
-        if (event.delta) {
-          currentTranscriptRef.current += event.delta;
-          setTranscript(currentTranscriptRef.current);
-          console.log('💭 Partial transcript:', event.delta);
-        }
-        break;
-
-      case 'conversation.item.input_audio_transcription.completed':
-        // Final transcription
-        const finalTranscript = currentTranscriptRef.current.trim();
-        if (finalTranscript) {
-          console.log('✅ Final transcript:', finalTranscript);
-          setTranscript(finalTranscript);
-          
-          // Add to conversation history and process
-          conversationHistoryRef.current.push({
-            role: 'user',
-            content: finalTranscript
-          });
-          
-          // Process the message with GPT
-          processWithGPT(finalTranscript);
-        }
-        // Reset for next input
-        currentTranscriptRef.current = '';
-        break;
-
-      case 'conversation.item.output.text':
-        // AI response as text
-        if (event.text) {
-          console.log('🤖 AI Response:', event.text);
-          conversationHistoryRef.current.push({
-            role: 'assistant',
-            content: event.text
-          });
-          
-          // Speak the response using browser TTS
-          speakResponse(event.text);
-        }
-        break;
-
-      case 'error':
-        console.error('❌ API Error:', event.error);
-        const errorMessage = event.error?.message || event.error?.code || 'Unknown API error';
-        setError(errorMessage);
-        break;
-
-      default:
-        console.log('📋 Unhandled event type:', event.type);
-    }
-  }, []);
-
-  // Process user input with GPT-4
-  const processWithGPT = useCallback(async (userMessage: string) => {
-    if (isProcessingRef.current) return;
-    
-    setIsProcessing(true);
-    isProcessingRef.current = true;
-    
-    try {
-      console.log('🧠 Processing with GPT-4:', userMessage);
-      
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: userMessage,
-          conversationHistory: conversationHistoryRef.current.slice(-10) // Last 10 messages
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from API');
-      }
-
-      const data = await response.json();
-      console.log('✅ GPT Response:', data.response);
-      
-      // Add to conversation history
-      conversationHistoryRef.current.push({
-        role: 'assistant',
-        content: data.response
-      });
-      
-      // Speak the response
-      speakResponse(data.response);
-      
-    } catch (err) {
-      console.error('❌ Error processing with GPT:', err);
-      setError('Failed to process your message');
-      speakResponse("I'm having trouble understanding. Could you try again?");
-    } finally {
-      setIsProcessing(false);
-      isProcessingRef.current = false;
-    }
-  }, []);
 
   // Speak response using browser TTS (keeping existing TTS for now)
   const speakResponse = useCallback((text: string) => {
@@ -238,7 +149,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
       });
       
       const audioChunks: Blob[] = [];
-      let recordingStartTime = Date.now();
+      const recordingStartTime = Date.now();
       
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {

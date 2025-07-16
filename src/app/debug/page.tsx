@@ -5,8 +5,18 @@ import { getSessionManager } from '@/lib/sessionManager';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 
 export default function Debug() {
-  const [sessionInfo, setSessionInfo] = useState<any>(null);
-  const [timerInfo, setTimerInfo] = useState<any>(null);
+  type SessionInfo = {
+    data: unknown;
+    remaining: number;
+    canStart: boolean;
+    timestamp: string;
+  };
+  type TimerInfo = {
+    timeLeft: number;
+    timestamp: string;
+  };
+  const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
+  const [timerInfo, setTimerInfo] = useState<TimerInfo | null>(null);
   const speechRecognition = useSpeechRecognition();
 
   useEffect(() => {
@@ -172,8 +182,8 @@ export default function Debug() {
           <h2 className="text-lg font-semibold mb-4">Instructions</h2>
           <div className="text-sm space-y-2">
             <p>1. Open browser console (F12) to see detailed logs</p>
-            <p>2. Click "Start Session" to test session manager</p>
-            <p>3. Click "Start Listening" to test speech recognition</p>
+            <p>2. Click &quot;Start Session&quot; to test session manager</p>
+            <p>3. Click &quot;Start Listening&quot; to test speech recognition</p>
             <p>4. Check if timer starts counting down after starting session</p>
             <p>5. Check if microphone permission is granted</p>
           </div>

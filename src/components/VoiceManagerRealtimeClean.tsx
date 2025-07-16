@@ -154,12 +154,12 @@ export default function VoiceManagerRealtime({
       // Mark as started
       setHasStarted(true);
       
-      const remainingTime = sessionManager.getRemainingFreeTime();
+
       
       // Start OpenAI Realtime API listening
       try {
         await realtimeVoice.startListening();
-      } catch (error) {
+      } catch {
         return;
       }
       

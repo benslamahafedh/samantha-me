@@ -23,7 +23,7 @@ async function getConnection(): Promise<Connection> {
       // Test the connection
       await connection.getVersion();
       return connection;
-    } catch (error) {
+    } catch {
       continue;
     }
   }
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     let senderPublicKey: PublicKey;
     try {
       senderPublicKey = new PublicKey(walletAddress);
-    } catch (error) {
+    } catch {
       return NextResponse.json({ 
         verified: false, 
         error: 'Invalid wallet address format' 
@@ -114,7 +114,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Calculate the amount transferred
-    const senderBalanceChange = preBalances[senderIndex] - postBalances[senderIndex];
     const receiverBalanceChange = postBalances[receiverIndex] - preBalances[receiverIndex];
 
     // Verify the payment amount (allowing for small transaction fees)
@@ -156,8 +155,8 @@ export async function POST(req: NextRequest) {
       blockHash: transaction.transaction.message.recentBlockhash
     });
 
-  } catch (error) {
-    console.error('Payment verification error:', error);
+  } catch {
+    console.error('Payment verification error');
     return NextResponse.json({ 
       verified: false, 
       error: 'Payment verification failed' 

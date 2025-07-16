@@ -9,39 +9,19 @@ import PaymentModal from '@/components/PaymentModal';
 import WalletProvider from '@/components/WalletProvider';
 
 export default function Home() {
-  const [transcript, setTranscript] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isListening, setIsListening] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [hasStarted, setHasStarted] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isIntroComplete, setIsIntroComplete] = useState(false);
   const [sessionTimeLeft, setSessionTimeLeft] = useState(180); // 3 minutes
   const [sessionEnded, setSessionEnded] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [manualStartListening, setManualStartListening] = useState<(() => void) | null>(null);
   const [hasWalletAccess, setHasWalletAccess] = useState(false);
   const [isTrialActive, setIsTrialActive] = useState(false);
 
   // Wallet connection state
-  const { connected, connecting, wallet } = useWallet();
-
-  // Handle wallet connection errors
-  const handleWalletError = useCallback((error: any) => {
-    console.log('Wallet connection error:', error);
-    // Don't show error to user, just log it
-    // The wallet adapter will handle the error gracefully
-  }, []);
-
-  // Manual wallet connection function
-  const handleManualConnect = useCallback(async () => {
-    try {
-      console.log('Attempting manual wallet connection...');
-      // The wallet adapter will handle the connection
-    } catch (error) {
-      console.log('Manual connection failed:', error);
-    }
-  }, []);
+  const { connected } = useWallet();
 
   // Check if wallet is available - client-side only to prevent hydration mismatch
   const [isWalletAvailable, setIsWalletAvailable] = useState(false);
@@ -50,26 +30,11 @@ export default function Home() {
   useEffect(() => {
     setIsClient(true);
     // Check for wallet availability on client side only
-    const hasWallet = !!(window as any).solana || !!(window as any).phantom || !!(window as any).solflare;
+    const hasWallet = !!(window as unknown as Record<string, unknown>).solana || !!(window as unknown as Record<string, unknown>).phantom || !!(window as unknown as Record<string, unknown>).solflare;
     setIsWalletAvailable(hasWallet);
   }, []);
 
-  const handleTranscriptChange = (newTranscript: string) => {
-    setTranscript(newTranscript);
-  };
 
-  const handleSpeakingChange = (speaking: boolean) => {
-    setIsSpeaking(speaking);
-  };
-
-  const handleListeningChange = (listening: boolean) => {
-    setIsListening(listening);
-  };
-
-  const handleError = (errorMessage: string) => {
-    setError(errorMessage);
-    setTimeout(() => setError(null), 5000);
-  };
 
   const handleHasStartedChange = (started: boolean) => {
     setHasStarted(started);
@@ -97,9 +62,7 @@ export default function Home() {
     // The SecureVoiceManager will automatically detect the payment and update access
   };
 
-  const handleManualStartListening = (startFn: () => void) => {
-    setManualStartListening(() => startFn);
-  };
+
 
   const handleIntroComplete = useCallback(() => {
     setIsIntroComplete(true);
@@ -122,8 +85,8 @@ export default function Home() {
           <VoiceVisualization
             isListening={isListening}
             isSpeaking={isSpeaking}
-            transcript={transcript}
-            error={error}
+            transcript={''}
+            error={null}
             hasStarted={hasStarted}
             isReady={isReady}
             isIntroComplete={isIntroComplete}
@@ -134,14 +97,13 @@ export default function Home() {
           />
           
           <SecureVoiceManager
-            onSpeakingChange={handleSpeakingChange}
-            onListeningChange={handleListeningChange}
+            onSpeakingChange={setIsSpeaking}
+            onListeningChange={setIsListening}
             onHasStartedChange={handleHasStartedChange}
             onIsReadyChange={handleIsReadyChange}
             onSessionTimeChange={handleSessionTimeChange}
             onSessionEndedChange={handleSessionEndedChange}
             onRequirePayment={handleRequirePayment}
-            onManualStartListening={handleManualStartListening}
             onAccessStatusChange={handleAccessStatusChange}
           />
         </div>

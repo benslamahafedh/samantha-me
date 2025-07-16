@@ -27,7 +27,7 @@ export default function VoiceVisualization({
   isIntroComplete = false,
   onIntroComplete,
   onStartConversation,
-  sessionTimeLeft = 60,
+
   sessionEnded = false
 }: VoiceVisualizationProps) {
   const [dots, setDots] = useState('');

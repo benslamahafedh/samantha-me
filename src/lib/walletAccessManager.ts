@@ -74,20 +74,9 @@ export class WalletAccessManager {
 
       return data.hasAccess;
 
-    } catch (error) {
-      console.error('Error checking wallet access:', error);
-      
-      // On error, maintain current access state but update timestamp
-      this.accessData = {
-        hasAccess: this.accessData?.hasAccess || false,
-        walletAddress,
-        transactionSignature: this.accessData?.transactionSignature,
-        amount: this.accessData?.amount,
-        blockTime: this.accessData?.blockTime,
-        lastChecked: Date.now()
-      };
-      
-      return this.accessData?.hasAccess || false;
+    } catch {
+      console.error('Failed to check wallet access');
+      return false;
     } finally {
       this.checkInProgress = false;
     }
@@ -124,7 +113,7 @@ export class WalletAccessManager {
     try {
       const trialUsed = localStorage.getItem(trialKey);
       return !trialUsed;
-    } catch (error) {
+    } catch {
       // If localStorage fails, allow trial
       return true;
     }
@@ -138,7 +127,7 @@ export class WalletAccessManager {
     
     try {
       localStorage.setItem(trialKey, 'true');
-    } catch (error) {
+    } catch {
       // Ignore localStorage errors
     }
   }
@@ -151,7 +140,7 @@ export class WalletAccessManager {
     
     try {
       localStorage.removeItem(trialKey);
-    } catch (error) {
+    } catch {
       // Ignore localStorage errors
     }
   }
@@ -172,7 +161,7 @@ export class WalletAccessManager {
           }
         });
       }
-    } catch (error) {
+    } catch {
       // Ignore localStorage errors
     }
   }

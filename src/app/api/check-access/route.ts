@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
     let userPublicKey: PublicKey;
     try {
       userPublicKey = new PublicKey(walletAddress);
-    } catch (error) {
+    } catch {
       return NextResponse.json({ 
         hasAccess: false, 
         error: 'Invalid wallet address format' 

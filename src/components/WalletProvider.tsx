@@ -5,7 +5,6 @@ import {
   ConnectionProvider,
   WalletProvider as SolanaWalletProvider,
 } from '@solana/wallet-adapter-react';
-import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
 import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
@@ -13,7 +12,6 @@ import {
   LedgerWalletAdapter,
 } from '@solana/wallet-adapter-wallets';
 import { WalletModalProvider } from '@solana/wallet-adapter-react-ui';
-import { clusterApiUrl } from '@solana/web3.js';
 
 // Import wallet adapter CSS
 import '@solana/wallet-adapter-react-ui/styles.css';
@@ -23,9 +21,6 @@ interface WalletProviderProps {
 }
 
 export default function WalletProvider({ children }: WalletProviderProps) {
-  // Choose network - you can switch between 'mainnet-beta', 'testnet', 'devnet'
-  const network = WalletAdapterNetwork.Mainnet;
-
   // You can also provide a custom RPC endpoint
   const endpoint = useMemo(() => {
     // Use a reliable RPC endpoint
@@ -43,19 +38,24 @@ export default function WalletProvider({ children }: WalletProviderProps) {
   );
 
   // Handle wallet errors gracefully
-  const handleError = useCallback((error: any) => {
+  const handleError = useCallback((error: unknown) => {
     console.log('Wallet connection error:', error);
     
     // Don't throw the error, just log it
     // This prevents the app from crashing due to wallet issues
     
     // If it's a connection error, we can handle it silently
-    if (error?.name === 'WalletConnectionError') {
-      console.log('Wallet connection failed - user may not have wallet installed or wallet is locked');
-    } else if (error?.name === 'WalletNotInstalledError') {
-      console.log('Wallet not installed - user needs to install Phantom or Solflare');
-    } else if (error?.name === 'WalletNotSelectedError') {
-      console.log('No wallet selected - user needs to select a wallet');
+    if (error && typeof error === 'object' && 'name' in error) {
+      const errorName = error.name as string;
+      if (errorName === 'WalletConnectionError') {
+        console.log('Wallet connection failed - user may not have wallet installed or wallet is locked');
+      } else if (errorName === 'WalletNotInstalledError') {
+        console.log('Wallet not installed - user needs to install Phantom or Solflare');
+      } else if (errorName === 'WalletNotSelectedError') {
+        console.log('No wallet selected - user needs to select a wallet');
+      } else {
+        console.log('Unknown wallet error:', error);
+      }
     } else {
       console.log('Unknown wallet error:', error);
     }

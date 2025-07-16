@@ -100,8 +100,8 @@ export class SessionManager {
           localStorage.removeItem(this.storageKey);
         }
       }
-    } catch (error) {
-      console.error('Failed to load session:', error);
+    } catch {
+      console.error('Failed to load session data');
       this.sessionData = null;
     }
   }
@@ -111,8 +111,8 @@ export class SessionManager {
     
     try {
       localStorage.setItem(this.storageKey, JSON.stringify(this.sessionData));
-    } catch (error) {
-      console.error('Failed to save session:', error);
+    } catch {
+      console.error('Failed to save session data');
     }
   }
 
@@ -221,7 +221,7 @@ export class SessionManager {
       this.onTimeUpdateCallbacks.forEach(cb => {
         try {
           cb(timeLeft);
-        } catch (error) {
+        } catch {
           // Ignore callback errors
         }
       });
@@ -234,7 +234,7 @@ export class SessionManager {
       this.onTimeUpdateCallbacks.forEach(cb => {
         try {
           cb(Infinity);
-        } catch (error) {
+        } catch {
           // Ignore callback errors
         }
       });

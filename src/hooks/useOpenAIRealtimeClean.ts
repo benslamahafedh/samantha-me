@@ -84,8 +84,9 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
 
       setIsConnected(true);
       setError(null);
-    } catch (err) {
-      setError('Failed to initialize voice connection');
+    } catch {
+      console.error('Failed to initialize WebSocket');
+      setError('Failed to connect to voice service');
     }
   }, [isSupported]);
 
@@ -153,7 +154,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
       });
       
       const audioChunks: Blob[] = [];
-      let recordingStartTime = Date.now();
+      const recordingStartTime = Date.now();
       
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -262,7 +263,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
                 
                 speakResponse(data.response);
                 
-              } catch (err) {
+              } catch {
                 setError('Failed to process your message');
                 speakResponse("I'm having trouble understanding. Could you try again?");
               } finally {
@@ -275,8 +276,8 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
             consecutiveSilentChunksRef.current += 1;
           }
           
-        } catch (err) {
-          console.error('Audio processing error:', err);
+        } catch {
+          console.error('Audio processing error');
           setError('Failed to process voice input');
           consecutiveSilentChunksRef.current += 1;
         }
@@ -300,10 +301,11 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
         }
       }, 3000);
       
-    } catch (err) {
-      setError('Failed to access microphone');
+    } catch {
+      console.error('Failed to start listening');
+      setError('Failed to start voice recognition');
     }
-  }, [isListening]);
+  }, [isListening, isConnected, initializeWebSocket, isMeaningfulSpeech, MAX_SILENT_CHUNKS, PROCESSING_COOLDOWN, lastProcessingTimeRef, lastResponseRef, setIsProcessing, setTranscript, setError, setIsListening, setIsSpeaking, speakResponse, conversationHistoryRef, isProcessingRef]);
 
   // Stop listening
   const stopListening = useCallback(() => {
@@ -311,7 +313,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
       mediaRecorderRef.current.stop();
     }
     setIsListening(false);
-  }, []);
+  }, [setIsListening]);
 
   // Reset transcript
   const resetTranscript = useCallback(() => {
@@ -320,7 +322,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
     consecutiveSilentChunksRef.current = 0;
     lastProcessingTimeRef.current = 0;
     lastResponseRef.current = '';
-  }, []);
+  }, [setTranscript]);
 
   // Send a text message (for manual input)
   const sendMessage = useCallback(async (message: string) => {
@@ -359,14 +361,14 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
       
       speakResponse(data.response);
       
-    } catch (err) {
+    } catch {
       setError('Failed to process your message');
       speakResponse("I'm having trouble understanding. Could you try again?");
     } finally {
       setIsProcessing(false);
       isProcessingRef.current = false;
     }
-  }, []);
+  }, [setTranscript, isProcessingRef, setIsProcessing, conversationHistoryRef, speakResponse, setError]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -375,7 +377,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
         mediaRecorderRef.current.stop();
       }
     };
-  }, []);
+  }, [mediaRecorderRef]);
 
   return {
     isConnected,

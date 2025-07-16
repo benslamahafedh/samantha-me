@@ -6,7 +6,12 @@ import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
 
 export default function TestSimple() {
-  const [sessionInfo, setSessionInfo] = useState<any>(null);
+  type SessionInfo = {
+    canStart: boolean;
+    remaining: number;
+    data: unknown;
+  };
+  const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [timeLeft, setTimeLeft] = useState(180);
   const speechRecognition = useSpeechRecognition();
   const textToSpeech = useTextToSpeech();
@@ -146,9 +151,9 @@ export default function TestSimple() {
         <h2 className="text-xl font-semibold mb-4">Instructions</h2>
         <div className="text-sm space-y-2">
           <p>1. Open browser console (F12) to see detailed logs</p>
-          <p>2. Click "Start Session" - timer should start counting down</p>
-          <p>3. Click "Start Listening" - should show microphone permission prompt</p>
-          <p>4. Click "Test TTS" - should hear Samantha's voice</p>
+          <p>2. Click &quot;Start Session&quot; - timer should start counting down</p>
+          <p>3. Click &quot;Start Listening&quot; - should show microphone permission prompt</p>
+          <p>4. Click &quot;Test TTS&quot; - should hear Samantha&apos;s voice</p>
           <p>5. If everything works here, the main app should work too</p>
         </div>
       </div>
