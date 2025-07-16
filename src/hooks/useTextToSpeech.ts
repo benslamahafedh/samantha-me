@@ -104,9 +104,9 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
       utteranceRef.current = utterance;
 
       // Configure the utterance for a charming, intimate voice
-      utterance.rate = 0.75; // Very slow and deliberate
-      utterance.pitch = 1.05; // Slightly warmer pitch
-      utterance.volume = 0.6; // Very soft and intimate
+      utterance.rate = 0.9; // Natural speaking rate
+      utterance.pitch = 1.0; // Natural pitch
+      utterance.volume = 0.8; // Clear but soft volume
 
       if (selectedVoice) {
         utterance.voice = selectedVoice;

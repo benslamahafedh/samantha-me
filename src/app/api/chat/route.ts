@@ -26,15 +26,20 @@ Never give long explanations or advice unless specifically asked. Keep it conver
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('🚀 API Route called');
+    
     // Check if API key is configured
     if (!process.env.OPENAI_API_KEY) {
-      console.error('OpenAI API key is not configured');
+      console.error('❌ OpenAI API key is not configured');
       return NextResponse.json({ error: 'OpenAI API key is not configured' }, { status: 500 });
     }
 
     const { message, conversationHistory = [] } = await req.json();
+    console.log('📥 Received message:', message);
+    console.log('📜 Conversation history length:', conversationHistory.length);
 
     if (!message) {
+      console.error('❌ No message provided');
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
@@ -44,9 +49,12 @@ export async function POST(req: NextRequest) {
       { role: 'user', content: message }
     ];
 
+    console.log('🤖 Calling OpenAI...');
+    
     // Try GPT-4 first, fallback to GPT-3.5-turbo if not available
     let completion;
     try {
+      console.log('🎯 Trying GPT-4...');
       completion = await openai.chat.completions.create({
         model: 'gpt-4',
         messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
@@ -55,25 +63,30 @@ export async function POST(req: NextRequest) {
         presence_penalty: 0.3,
         frequency_penalty: 0.2,
       });
+      console.log('✅ GPT-4 success');
     } catch (gpt4Error: unknown) {
       const errorMessage = gpt4Error instanceof Error ? gpt4Error.message : 'Unknown error';
-      console.log('GPT-4 failed, trying GPT-3.5-turbo:', errorMessage);
-              completion = await openai.chat.completions.create({
-          model: 'gpt-3.5-turbo',
-          messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-          temperature: 0.7,
-          max_tokens: 80, // Much shorter responses
-          presence_penalty: 0.3,
-          frequency_penalty: 0.2,
-        });
+      console.log('⚠️ GPT-4 failed, trying GPT-3.5-turbo:', errorMessage);
+      completion = await openai.chat.completions.create({
+        model: 'gpt-3.5-turbo',
+        messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+        temperature: 0.7,
+        max_tokens: 80, // Much shorter responses
+        presence_penalty: 0.3,
+        frequency_penalty: 0.2,
+      });
+      console.log('✅ GPT-3.5-turbo success');
     }
 
     const response = completion.choices[0]?.message?.content;
+    console.log('📤 OpenAI response:', response);
 
     if (!response) {
+      console.error('❌ No response from OpenAI');
       return NextResponse.json({ error: 'No response from OpenAI' }, { status: 500 });
     }
 
+    console.log('✅ API Route completed successfully');
     return NextResponse.json({ response });
   } catch (error: unknown) {
     console.error('OpenAI API error:', error);

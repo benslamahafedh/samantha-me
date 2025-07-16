@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import WalletProvider from "@/components/WalletProvider";
 
 export const metadata: Metadata = {
   title: "Samantha - Voice Assistant",
@@ -41,7 +42,9 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased" suppressHydrationWarning={true}>
         <ErrorBoundary>
-        {children}
+          <WalletProvider>
+            {children}
+          </WalletProvider>
         </ErrorBoundary>
       </body>
     </html>

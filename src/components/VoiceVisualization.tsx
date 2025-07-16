@@ -12,6 +12,7 @@ interface VoiceVisualizationProps {
   isReady?: boolean;
   isIntroComplete?: boolean;
   onIntroComplete?: () => void;
+  onStartConversation?: () => void;
   sessionTimeLeft?: number;
   sessionEnded?: boolean;
 }
@@ -25,6 +26,7 @@ export default function VoiceVisualization({
   isReady = false,
   isIntroComplete = false,
   onIntroComplete,
+  onStartConversation,
   sessionTimeLeft = 60,
   sessionEnded = false
 }: VoiceVisualizationProps) {
@@ -40,17 +42,7 @@ export default function VoiceVisualization({
     setIsMounted(true);
   }, []);
 
-  // Debug timer updates
-  useEffect(() => {
-    if (hasStarted && !sessionEnded) {
-      console.log('⏰ TIMER DISPLAY UPDATE:', {
-        sessionTimeLeft,
-        hasStarted,
-        sessionEnded,
-        displayTime: `${Math.floor(sessionTimeLeft / 60)}:${(sessionTimeLeft % 60).toString().padStart(2, '0')}`
-      });
-    }
-  }, [sessionTimeLeft, hasStarted, sessionEnded]);
+
 
   // COMPLETELY ISOLATED intro sequence - cannot be interrupted
   useEffect(() => {
@@ -584,18 +576,17 @@ export default function VoiceVisualization({
 
               {/* Central Organic Presence - Much Bigger */}
               <motion.div
-                className="relative z-10"
+                className={`relative z-10 ${isReady && !hasStarted ? 'hover:scale-105 transition-transform duration-300' : ''}`}
                 onMouseEnter={() => setIsHovering(true)}
                 onMouseLeave={() => setIsHovering(false)}
                 onTouchStart={() => setIsTouching(true)}
                 onTouchEnd={() => setIsTouching(false)}
                 onClick={() => {
-                  if (isReady) {
-                    const event = new CustomEvent('startConversation');
-                    window.dispatchEvent(event);
-                  }
+                        if (isReady && !hasStarted && isIntroComplete && onStartConversation) {
+        onStartConversation();
+      }
                 }}
-                style={{ cursor: isReady ? 'pointer' : 'default' }}
+                style={{ cursor: isReady && !hasStarted ? 'pointer' : 'default' }}
               >
                 {/* Outer Organic Aura */}
                 <motion.div
@@ -774,15 +765,27 @@ export default function VoiceVisualization({
                 </div>
               )}
 
-              {/* Enhanced Status Indication */}
+              {/* Enhanced Status Indication with Click Instruction */}
               <motion.div
-                className="absolute top-full mt-16 left-1/2 transform -translate-x-1/2"
+                className="absolute top-full mt-16 left-1/2 transform -translate-x-1/2 text-center"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 1.5 }}
               >
+                {/* Click instruction that appears after intro when ready */}
+                {isReady && !hasStarted && isIntroComplete && (
+                  <motion.p
+                    className="text-white/60 text-sm font-light mb-4 cursor-pointer hover:text-white/80 transition-colors"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 1, 0.8, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                  >
+                    Click to begin conversation
+                  </motion.p>
+                )}
+                
                 <motion.div
-                  className={`w-3 h-3 rounded-full ${isReady ? 'bg-rose-400' : 'bg-gray-400'}`}
+                  className={`w-3 h-3 rounded-full ${isReady ? 'bg-rose-400' : 'bg-gray-400'} mx-auto`}
                   style={{
                     boxShadow: isReady ? '0 0 15px rgba(244, 63, 94, 0.6)' : 'none'
                   }}

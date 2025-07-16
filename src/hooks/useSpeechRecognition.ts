@@ -19,24 +19,55 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
   
   const recognitionRef = useRef<unknown>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isStartingRef = useRef(false);
+  const startTimeRef = useRef<number>(0);
 
   const isSupported = typeof window !== 'undefined' && 
     ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
 
   const startListening = useCallback(() => {
+    console.log('🎤 startListening called');
+    
     if (!isSupported) {
-      setError('Speech recognition is not supported in this browser');
+      console.log('❌ Speech recognition not supported');
+      setError('❌ Speech recognition is not supported in this browser. Please try Chrome, Firefox, or Edge for the best experience.');
       return;
     }
 
-    // Prevent multiple instances - only start if not already listening
-    if (isListening) {
+    // Prevent multiple instances - check if already listening OR starting
+    if (isListening || isStartingRef.current) {
+      console.log('⏭️ Already listening or starting, skipping');
       return;
     }
 
+    isStartingRef.current = true;
+
+    // First, explicitly request microphone permission
+    console.log('🔐 Requesting microphone permission...');
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(() => {
+        console.log('✅ Microphone permission granted');
+        startSpeechRecognition();
+      })
+      .catch((error) => {
+        console.log('❌ Microphone permission denied:', error);
+        isStartingRef.current = false;
+        if (error.name === 'NotAllowedError') {
+          setError('❌ Microphone access denied. Please click the microphone icon in your browser\'s address bar and allow access, then refresh the page.');
+        } else if (error.name === 'NotFoundError') {
+          setError('❌ No microphone found. Please check your microphone is connected and try again.');
+        } else {
+          setError('❌ Could not access microphone. Please check your browser settings and ensure you\'re using HTTPS.');
+        }
+      });
+  }, [isListening, isSupported]);
+
+  const startSpeechRecognition = useCallback(() => {
+    console.log('🧹 Cleaning up existing recognition');
     // Clean up any existing recognition
     if (recognitionRef.current) {
       try {
+        console.log('🛑 Aborting existing recognition instance');
         (recognitionRef.current as unknown as SpeechRecognition).abort();
         recognitionRef.current = null;
       } catch {
@@ -46,20 +77,40 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
 
     // Wait a bit before creating new instance to avoid conflicts
     setTimeout(() => {
+      // Double-check that we should still start
+      if (!isStartingRef.current) {
+        console.log('🚫 Starting cancelled, aborting speech recognition creation');
+        return;
+      }
+      
       try {
+        console.log('🔧 Creating new SpeechRecognition instance');
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        recognitionRef.current = new SpeechRecognition();
+        
+        // Create fresh instance
+        const recognition = new SpeechRecognition();
+        const instanceId = Math.random().toString(36).substring(2, 8);
+        console.log(`🆔 Creating recognition instance: ${instanceId}`);
+        recognitionRef.current = recognition;
 
-        (recognitionRef.current as unknown as SpeechRecognition).continuous = true;
-        (recognitionRef.current as unknown as SpeechRecognition).interimResults = true;
-        (recognitionRef.current as unknown as SpeechRecognition).lang = 'en-US';
+        // More conservative settings to avoid browser issues
+        recognition.continuous = false; // Start with non-continuous to avoid immediate stops
+        recognition.interimResults = false; // Disable interim to reduce complexity
+        recognition.lang = 'en-US';
+        
+        // Web Speech API doesn't have direct timeout control, but we can use continuous mode
+        // The auto-restart mechanism in VoiceManager will handle keeping it alive
+        console.log('🔧 Configured speech recognition for extended listening sessions');
 
-        (recognitionRef.current as unknown as SpeechRecognition).onstart = () => {
+        recognition.onstart = () => {
+          console.log(`✅ SpeechRecognition started successfully [${instanceId}]`);
+          startTimeRef.current = Date.now();
           setIsListening(true);
           setError(null);
+          isStartingRef.current = false;
         };
 
-        (recognitionRef.current as unknown as SpeechRecognition).onresult = (event: SpeechRecognitionEvent) => {
+        recognition.onresult = (event: SpeechRecognitionEvent) => {
           let interimTranscript = '';
           let finalTranscript = '';
 
@@ -75,74 +126,109 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
           setInterimTranscript(interimTranscript);
           
           if (finalTranscript) {
+            console.log('🎯 Final transcript received:', finalTranscript);
             setTranscript(prev => prev + finalTranscript);
             setInterimTranscript('');
           }
-
-          // Auto-restart if no speech detected for 6 seconds (balanced pause)
-          if (timeoutRef.current) {
-            clearTimeout(timeoutRef.current);
+          
+          // Log interim results for debugging
+          if (interimTranscript) {
+            console.log('💭 Interim transcript:', interimTranscript);
           }
-          timeoutRef.current = setTimeout(() => {
-            if (recognitionRef.current && isListening) {
-              (recognitionRef.current as unknown as SpeechRecognition).stop();
-              setTimeout(() => startListening(), 500);
-            }
-          }, 6000); // Balanced 6 seconds - not too short, not too long
+
+          // Remove auto-restart timeout - let the VoiceManager handle restarting
+          // This prevents infinite restart loops
         };
 
-        (recognitionRef.current as unknown as SpeechRecognition).onerror = (event: { error: string }) => {
+        recognition.onerror = (event: { error: string }) => {
+          console.log(`❌ SpeechRecognition error [${instanceId}]:`, event.error);
+          
           // Handle specific errors more gracefully
           if (event.error === 'aborted') {
             // Don't show error for aborted - it's usually intentional
+            console.log(`🛑 SpeechRecognition aborted (intentional) [${instanceId}]`);
             setIsListening(false);
+            isStartingRef.current = false;
             return;
           }
           
           if (event.error === 'network') {
             setError('Network connection issue. Please check your internet.');
             setIsListening(false);
-            // Auto-retry after network error
-            setTimeout(() => {
-              if (!isListening) startListening();
-            }, 3000);
+            isStartingRef.current = false;
             return;
           }
           
           if (event.error === 'not-allowed') {
-            setError('Microphone permission denied. Please allow microphone access.');
+            setError('❌ Microphone access denied. Please click the microphone icon in your browser and allow access, then refresh the page.');
             setIsListening(false);
+            isStartingRef.current = false;
             return;
           }
           
           // For other errors, show a generic message and retry
           setError('Voice recognition temporarily unavailable');
           setIsListening(false);
+          isStartingRef.current = false;
           
-          // Auto-retry for most errors after a short delay
-          setTimeout(() => {
-            if (!isListening) {
-              setError(null);
-              startListening();
-            }
-          }, 2000);
+          // DISABLED: Auto-retry for most errors - CAUSING INFINITE LOOP
+          // setTimeout(() => {
+          //   if (!isListening) {
+          //     setError(null);
+          //     startListening();
+          //   }
+          // }, 2000);
         };
 
-        (recognitionRef.current as unknown as SpeechRecognition).onend = () => {
+        // Add additional event handlers for debugging
+        recognition.onsoundstart = () => {
+          console.log(`🔊 Sound detection started [${instanceId}]`);
+        };
+        
+        recognition.onsoundend = () => {
+          console.log(`🔇 Sound detection ended [${instanceId}]`);
+        };
+        
+        recognition.onspeechstart = () => {
+          console.log(`🗣️ Speech detection started [${instanceId}]`);
+        };
+        
+        recognition.onspeechend = () => {
+          console.log(`🤐 Speech detection ended [${instanceId}]`);
+        };
+        
+        recognition.onend = () => {
+          const endTime = Date.now();
+          const duration = endTime - startTimeRef.current;
+          console.log(`🛑 SpeechRecognition ended naturally [${instanceId}] after ${duration}ms`);
+          
+          if (duration < 1000) {
+            console.log(`⚠️ Recognition ended too quickly (${duration}ms) - trying restart`);
+            setError('Speech recognition ended too quickly. Click the restart button to try again.');
+          }
+          
           setIsListening(false);
+          isStartingRef.current = false;
+          
+          // Don't auto-restart here - let the VoiceManager handle it
+          // This prevents the infinite restart loop
         };
 
         try {
-          (recognitionRef.current as unknown as SpeechRecognition).start();
-        } catch {
+          console.log(`🚀 Calling SpeechRecognition.start() [${instanceId}]`);
+          recognition.start();
+        } catch (error) {
+          console.log(`❌ Failed to start speech recognition [${instanceId}]:`, error);
           setError('Failed to start speech recognition');
           setIsListening(false);
+          isStartingRef.current = false;
         }
       } catch {
         setError('Failed to initialize speech recognition');
         setIsListening(false);
+        isStartingRef.current = false;
       }
-    }, 100); // Small delay to prevent conflicts
+          }, 500); // Longer delay to ensure browser readiness
   }, [isSupported, isListening]);
 
   const stopListening = useCallback(() => {
@@ -157,9 +243,11 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
       }
       setIsListening(false);
       setError(null); // Clear any errors when manually stopping
+      isStartingRef.current = false; // Reset starting flag
     } catch {
       // Ignore errors during cleanup
       setIsListening(false);
+      isStartingRef.current = false;
     }
   }, []);
 
@@ -240,4 +328,4 @@ declare global {
     readonly transcript: string;
     readonly confidence: number;
   }
-} 
+}

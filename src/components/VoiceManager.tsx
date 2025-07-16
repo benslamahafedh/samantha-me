@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition';
 import { useTextToSpeech } from '@/hooks/useTextToSpeech';
+import { getSessionManager } from '@/lib/sessionManager';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -19,6 +20,8 @@ interface VoiceManagerProps {
   onIsReadyChange?: (isReady: boolean) => void;
   onSessionTimeChange?: (timeLeft: number) => void;
   onSessionEndedChange?: (sessionEnded: boolean) => void;
+  onRequirePayment?: () => void;
+  onManualStartListening?: (startFn: () => void) => void;
 }
 
 export default function VoiceManager({
@@ -29,22 +32,24 @@ export default function VoiceManager({
   onHasStartedChange,
   onIsReadyChange,
   onSessionTimeChange,
-  onSessionEndedChange
+  onSessionEndedChange,
+  onRequirePayment,
+  onManualStartListening
 }: VoiceManagerProps) {
   const [conversationHistory, setConversationHistory] = useState<Message[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [hasStarted, setHasStarted] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [sessionEnded, setSessionEnded] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(60); // 60 seconds = 1 minute
   
   const processingRef = useRef(false);
   const lastProcessedTranscript = useRef('');
-  const sessionTimerRef = useRef<number | null>(null);
-  const countdownIntervalRef = useRef<number | null>(null);
-  const timeLeftRef = useRef(60);
-  const sessionEndedRef = useRef(false);
+  const sessionManagerRef = useRef(getSessionManager());
+  const hasShownPaymentRef = useRef(false);
+  const waitingForTTSRef = useRef(false);
+  const shouldBeListeningRef = useRef(false);
+  const listeningTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastRestartTimeRef = useRef(0);
 
   const speechRecognition = useSpeechRecognition();
   const textToSpeech = useTextToSpeech();
@@ -52,6 +57,49 @@ export default function VoiceManager({
   // Track if component has mounted on client side
   useEffect(() => {
     setIsMounted(true);
+    
+    // Set up session manager listeners
+    const sessionManager = sessionManagerRef.current;
+    
+    const handleSessionEnd = () => {
+      console.log('🛑 SESSION ENDED - COMPLETELY BLOCKING ACCESS');
+      setSessionEnded(true);
+      onSessionEndedChange?.(true);
+      
+      // Force stop all activities immediately
+      speechRecognition.stopListening();
+      speechRecognition.resetTranscript();
+      textToSpeech.stop();
+      
+      // Clear all processing states
+      processingRef.current = false;
+      lastProcessedTranscript.current = '';
+      shouldBeListeningRef.current = false;
+      
+      // Don't speak any final message - just redirect
+      console.log('🔄 Redirecting to session-ended page...');
+      
+      // Immediate redirect to session-ended page
+      setTimeout(() => {
+        window.location.href = '/session-ended';
+      }, 500);
+    };
+
+    sessionManager.onSessionEnd(handleSessionEnd);
+    
+    const handleTimeUpdate = (timeLeft: number) => {
+      console.log(`⏱️ Session time remaining: ${timeLeft}s`);
+      onSessionTimeChange?.(timeLeft);
+    };
+
+    sessionManager.onTimeUpdate(handleTimeUpdate);
+    
+    return () => {
+      // Don't destroy the SessionManager - it's a singleton that should persist
+      // across component re-renders. Destroying it clears the timer.
+      console.log('🧹 VoiceManager: Cleanup called but not destroying SessionManager');
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Notify parent of hasStarted changes
@@ -74,18 +122,24 @@ export default function VoiceManager({
     onSpeakingChange?.(textToSpeech.isSpeaking);
   }, [textToSpeech.isSpeaking, onSpeakingChange]);
 
-  // Handle listening changes
+  // Handle listening changes - SIMPLIFIED
   useEffect(() => {
     onListeningChange?.(speechRecognition.isListening);
   }, [speechRecognition.isListening, onListeningChange]);
 
-  // Handle errors with better user messages
+  // DISABLED: Automatic restart doesn't work due to browser security constraints
+  // Speech recognition requires direct user gesture to start
   useEffect(() => {
-    if (speechRecognition.error) {
-      // Only show persistent errors to user, not temporary ones
-      if (!speechRecognition.error.includes('temporarily unavailable')) {
-        onError?.(speechRecognition.error);
-      }
+    if (!speechRecognition.isListening && hasStarted && !sessionEnded && !textToSpeech.isSpeaking && !processingRef.current) {
+      console.log('🚫 Speech recognition stopped - automatic restart disabled (requires user gesture)');
+      console.log('💡 User needs to click something to restart speech recognition');
+    }
+  }, [speechRecognition.isListening, hasStarted, sessionEnded, textToSpeech.isSpeaking]);
+
+  // Handle errors
+  useEffect(() => {
+    if (speechRecognition.error && !speechRecognition.error.includes('temporarily unavailable')) {
+      onError?.(speechRecognition.error);
     }
   }, [speechRecognition.error, onError]);
 
@@ -95,406 +149,304 @@ export default function VoiceManager({
     }
   }, [textToSpeech.error, onError]);
 
-  // BULLETPROOF SESSION TERMINATION - Multiple fail-safes
-  const forceTerminateSession = useCallback(() => {
-    console.log('🚨 FORCE TERMINATING SESSION - ALL SYSTEMS STOP');
-    
-    // Set all flags
-    sessionEndedRef.current = true;
-    setSessionEnded(true);
-    onSessionEndedChange?.(true);
-    
-    // Stop all voice activities immediately
-    try {
-      speechRecognition.stopListening();
-      console.log('✅ Speech recognition force stopped');
-    } catch (error) {
-      console.error('❌ Error stopping speech recognition:', error);
-    }
-    
-    try {
-      textToSpeech.stop();
-      console.log('✅ Text-to-speech force stopped');
-    } catch (error) {
-      console.error('❌ Error stopping text-to-speech:', error);
-    }
-    
-    // Clear all processing
-    processingRef.current = false;
-    setIsProcessing(false);
-    
-    // Clear all timers
-    if (sessionTimerRef.current) {
-      clearTimeout(sessionTimerRef.current);
-      sessionTimerRef.current = null;
-    }
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
-    
-    // Final message
-    const endMessage = "Session terminated for cost efficiency. Thank you.";
-    textToSpeech.speak(endMessage);
-    
-    console.log('🛑 SESSION COMPLETELY TERMINATED');
-  }, [speechRecognition, textToSpeech, onSessionEndedChange]);
-
-  // SIMPLE AND RELIABLE TIMER - Using window.setInterval for maximum compatibility
-  const startSimpleTimer = useCallback(() => {
-    console.log('🔴 SIMPLE TIMER STARTING - 60 seconds countdown');
-    
-    // Clear any existing timers
-    if (sessionTimerRef.current) {
-      clearTimeout(sessionTimerRef.current);
-      sessionTimerRef.current = null;
-    }
-    if (countdownIntervalRef.current) {
-      clearInterval(countdownIntervalRef.current);
-      countdownIntervalRef.current = null;
-    }
-    
-    // Reset state
-    sessionEndedRef.current = false;
-    setSessionEnded(false);
-    setTimeLeft(60);
-    onSessionTimeChange?.(60);
-    
-    let secondsLeft = 60;
-    
-    // Simple countdown using window.setInterval
-    const intervalId = window.setInterval(() => {
-      secondsLeft--;
-      
-      console.log(`⏱️ SIMPLE TIMER: ${secondsLeft}s remaining`);
-      
-      // Update state
-      setTimeLeft(secondsLeft);
-      onSessionTimeChange?.(secondsLeft);
-      
-      // Final countdown
-      if (secondsLeft <= 10) {
-        console.log(`⚠️ FINAL COUNTDOWN: ${secondsLeft} seconds left!`);
-      }
-      
-      // Terminate when time is up
-      if (secondsLeft <= 0) {
-        console.log('🛑 SIMPLE TIMER EXPIRED - TERMINATING NOW');
-        window.clearInterval(intervalId);
-        forceTerminateSession();
-      }
-    }, 1000);
-    
-    // Store interval ID
-    countdownIntervalRef.current = intervalId;
-    
-    // Backup timer (60 seconds)
-    sessionTimerRef.current = window.setTimeout(() => {
-      console.log('🛑 BACKUP TIMER TRIGGERED - FORCE TERMINATION');
-      window.clearInterval(intervalId);
-      forceTerminateSession();
-    }, 60000);
-    
-    console.log('✅ SIMPLE TIMER STARTED SUCCESSFULLY');
-    
-  }, [forceTerminateSession, onSessionTimeChange]);
-
-  // Session timer - 1 minute limit (simplified)
-  useEffect(() => {
-    // Only start timer if we haven't already
-    if (hasStarted && !sessionEnded && !countdownIntervalRef.current) {
-      console.log('🟢 STARTING SIMPLE SESSION TIMER');
-      startSimpleTimer();
-    }
-    
-    return () => {
-      // Cleanup on unmount
-      if (sessionTimerRef.current) {
-        window.clearTimeout(sessionTimerRef.current);
-      }
-      if (countdownIntervalRef.current) {
-        window.clearInterval(countdownIntervalRef.current);
-      }
-    };
-  }, [hasStarted, sessionEnded, startSimpleTimer]);
-
-  // Debug session state changes
-  useEffect(() => {
-    console.log('📊 SESSION STATE CHANGE:', {
-      hasStarted,
-      sessionEnded,
-      timeLeft,
-      timerActive: !!countdownIntervalRef.current,
-      backupTimerActive: !!sessionTimerRef.current
-    });
-  }, [hasStarted, sessionEnded, timeLeft]);
-
-  // GLOBAL TIMER CHECK - Every 5 seconds, verify timer is running
-  useEffect(() => {
-    if (hasStarted && !sessionEnded) {
-      const timerCheck = setInterval(() => {
-        console.log('🔍 TIMER STATUS CHECK:', {
-          countdownActive: !!countdownIntervalRef.current,
-          backupActive: !!sessionTimerRef.current,
-          timeLeft,
-          sessionEndedRef: sessionEndedRef.current
-        });
-        
-        // If timer should be running but isn't, restart it
-        if (!countdownIntervalRef.current && !sessionEndedRef.current) {
-          console.log('🚨 TIMER MISSING - RESTARTING NOW');
-          startSimpleTimer();
-        }
-      }, 5000);
-      
-      return () => clearInterval(timerCheck);
-    }
-  }, [hasStarted, sessionEnded, timeLeft, startSimpleTimer]);
-
-  // Notify parent of session ended changes
-  useEffect(() => {
-    if (sessionEnded) {
-      console.log('🔴 SESSION ENDED - Notifying parent component');
-    }
-    onSessionEndedChange?.(sessionEnded);
-  }, [sessionEnded, onSessionEndedChange]);
-
-  // Send message to OpenAI API - BULLETPROOF PROTECTION
-  const sendMessage = useCallback(async (message: string) => {
-    // CRITICAL: Check session ended ref first (most reliable)
-    if (sessionEndedRef.current) {
-      console.log('🚫 BLOCKED API CALL - Session ended (ref check)');
+  // Process user speech
+  const processUserSpeech = useCallback(async (transcript: string) => {
+    if (processingRef.current || !transcript.trim() || sessionEnded) {
+      console.log('🚫 Skipping speech processing:', { 
+        processing: processingRef.current, 
+        empty: !transcript.trim(), 
+        ended: sessionEnded 
+      });
       return;
     }
     
-    // Debug current state
-    console.log('🔍 SEND MESSAGE DEBUG:', {
-      message: message.trim(),
-      processingRef: processingRef.current,
-      sessionEnded,
-      sessionEndedRef: sessionEndedRef.current,
-      hasStarted,
-      timeLeft,
-      timeLeftRef: timeLeftRef.current
-    });
-
-    // Multiple session end checks for safety
-    if (!message.trim()) {
-      console.log('🚫 BLOCKED API CALL - Empty message');
-      return;
-    }
-    
-    if (processingRef.current) {
-      console.log('🚫 BLOCKED API CALL - Already processing');
-      return;
-    }
-    
-    if (sessionEnded || sessionEndedRef.current) {
-      console.log('🚫 BLOCKED API CALL - Session ended (state check)');
-      return;
-    }
-
-    console.log('✅ SENDING MESSAGE TO API:', message);
+    console.log('🎙️ Processing user speech:', transcript);
     processingRef.current = true;
-    setIsProcessing(true);
 
     try {
+      // Add user message to history
+      const userMessage: Message = {
+        role: 'user',
+        content: transcript,
+        timestamp: Date.now()
+      };
+      
+      const updatedHistory = [...conversationHistory, userMessage];
+      setConversationHistory(updatedHistory);
+
+      console.log('📡 Calling OpenAI API...');
+      
+      // Call OpenAI API
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message,
-          conversationHistory: conversationHistory.map(msg => ({
-            role: msg.role,
-            content: msg.content
-          }))
+          message: transcript,
+          conversationHistory: updatedHistory.slice(-10) // Keep last 10 messages for context
         }),
       });
 
+      console.log('📡 API Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const error = await response.json();
+        console.error('❌ API Error:', error);
+        throw new Error(error.error || 'Failed to get response');
       }
 
       const data = await response.json();
+      console.log('✅ OpenAI Response:', data.response);
       
-      if (data.error) {
-        console.error('API Error:', data.error);
-        throw new Error(data.error);
-      }
-
-      // Add user message to conversation
-      const userMessage: Message = {
-        role: 'user',
-        content: message,
-        timestamp: Date.now()
-      };
-
-      // Add assistant response to conversation
+      // Add assistant message to history
       const assistantMessage: Message = {
         role: 'assistant',
         content: data.response,
         timestamp: Date.now()
       };
-
-      setConversationHistory(prev => [...prev, userMessage, assistantMessage]);
-
-      // Speak the response
-      textToSpeech.speak(data.response);
-
+      
+      setConversationHistory([...updatedHistory, assistantMessage]);
+      
+      // Don't speak if session has ended
+      if (!sessionEnded) {
+        console.log('🗣️ Speaking response:', data.response);
+        waitingForTTSRef.current = true;
+        textToSpeech.speak(data.response);
+      }
     } catch (error) {
-      console.error('Error sending message:', error);
-      onError?.(error instanceof Error ? error.message : 'Failed to send message');
+      console.error('❌ Error processing speech:', error);
+      if (!sessionEnded) {
+        const errorMessage = "I'm having trouble connecting. Could you try again?";
+        console.log('🗣️ Speaking error message:', errorMessage);
+        waitingForTTSRef.current = true;
+        textToSpeech.speak(errorMessage);
+      }
     } finally {
       processingRef.current = false;
-      setIsProcessing(false);
-    }
-  }, [conversationHistory, textToSpeech, onError, sessionEnded, hasStarted, timeLeft, sessionEndedRef]);
-
-  // Process transcript with better pause detection
-  useEffect(() => {
-    const currentTranscript = speechRecognition.transcript.trim();
-    
-    if (currentTranscript && 
-        currentTranscript !== lastProcessedTranscript.current && 
-        !processingRef.current &&
-        !textToSpeech.isSpeaking &&
-        !sessionEnded &&
-        !sessionEndedRef.current) {
-      
-      // Balanced approach - responsive but not interrupting
-      const endsWithPunctuation = /[.!?]$/.test(currentTranscript);
-      const hasGoodLength = currentTranscript.length > 15;
-      const hasClearPause = speechRecognition.interimTranscript === '';
-      
-      // Process if clearly complete OR if good length with clear pause
-      if ((endsWithPunctuation && hasGoodLength) || (hasGoodLength && hasClearPause)) {
-        // Shorter delay - just enough to catch continuation
-        setTimeout(() => {
-          // Check they haven't continued speaking
-          if (speechRecognition.interimTranscript === '' && !textToSpeech.isSpeaking) {
-            lastProcessedTranscript.current = currentTranscript;
-            speechRecognition.resetTranscript();
-            sendMessage(currentTranscript);
-          }
-        }, 2000); // Balanced 2-second wait
+      // If we're not speaking (error case), restart listening directly
+      if (!textToSpeech.isSpeaking && !sessionEnded) {
+        console.log('🔄 Processing finished, restarting listening');
+        speechRecognition.startListening();
       }
     }
-  }, [speechRecognition.transcript, speechRecognition.interimTranscript, sendMessage, textToSpeech.isSpeaking, speechRecognition, sessionEnded, sessionEndedRef]);
+  }, [conversationHistory, textToSpeech, sessionEnded]);
 
-    // Manual start conversation triggered by button
-  const startConversation = useCallback(async () => {
-    if (hasStarted) return;
-    
-    console.log('🟢 STARTING CONVERSATION - This should trigger the timer');
-    setHasStarted(true);
-    
-    // TEST: Force timer to start immediately
-    setTimeout(() => {
-      console.log('🧪 TESTING TIMER - Starting bulletproof timer now');
-      startSimpleTimer();
-    }, 100);
-    
-    // Start immediately when button is clicked
-    const greeting = "Hi there... I'm Samantha. What's on your mind?";
-    textToSpeech.speak(greeting);
-    
-    const greetingMessage: Message = {
-      role: 'assistant',
-      content: greeting,
-      timestamp: Date.now()
-    };
-    
-    setConversationHistory([greetingMessage]);
-    
-    // Start listening after greeting completes
-    setTimeout(() => {
-      speechRecognition.startListening();
-    }, 2500);
-  }, [hasStarted, speechRecognition, textToSpeech, startSimpleTimer]);
-
-  // Handle manual start from button
+  // Handle final transcript with proper listening controls
   useEffect(() => {
-    const handleManualStart = () => {
-      startConversation();
-    };
+    // Immediately stop processing if session has ended
+    if (sessionEnded) {
+      console.log('🚫 Session ended - blocking all transcript processing');
+      speechRecognition.stopListening();
+      speechRecognition.resetTranscript();
+      return;
+    }
 
-    window.addEventListener('startConversation', handleManualStart);
+    const finalTranscript = speechRecognition.transcript.trim();
     
-    return () => {
-      window.removeEventListener('startConversation', handleManualStart);
-    };
-  }, [startConversation]);
+    console.log('👂 Transcript update:', {
+      current: finalTranscript,
+      last: lastProcessedTranscript.current,
+      sessionEnded,
+      hasStarted,
+      isListening: speechRecognition.isListening,
+      interimTranscript: speechRecognition.interimTranscript?.trim(),
+      isProcessing: processingRef.current
+    });
+    
+    // Skip if we're already processing
+    if (processingRef.current) {
+      console.log('⏭️ Skipping - already processing');
+      return;
+    }
+    
+    // Skip if transcript is empty or too short
+    if (!finalTranscript || finalTranscript.length < 3) {
+      return;
+    }
+    
+    // Skip if this is the same transcript we just processed
+    if (finalTranscript === lastProcessedTranscript.current) {
+      return;
+    }
+    
+    // Skip or clean Samantha's own greetings
+    if (finalTranscript.toLowerCase().includes("welcome back") || 
+        finalTranscript.toLowerCase().includes("hello, i'm samantha")) {
+      console.log('🚫 Clearing Samantha\'s own voice from transcript');
+      speechRecognition.resetTranscript();
+      lastProcessedTranscript.current = '';
+      return;
+    }
+    
+    // Process user speech (automatic logic)
+    if (finalTranscript && 
+        finalTranscript.length > 3 && 
+        !sessionEnded && 
+        hasStarted) {
+      
+      console.log('🎯 Auto-processing user speech:', finalTranscript);
+      
+      // Stop listening during processing
+      speechRecognition.stopListening();
+      
+      lastProcessedTranscript.current = finalTranscript;
+      processUserSpeech(finalTranscript);
+      speechRecognition.resetTranscript();
+    }
+  }, [
+    speechRecognition.transcript, 
+    processUserSpeech, 
+    sessionEnded, 
+    hasStarted
+  ]);
 
-  // Auto-restart listening after speaking with balanced delay
+  // SIMPLIFIED Manual start from orbit click
   useEffect(() => {
-    if (!textToSpeech.isSpeaking && hasStarted && !speechRecognition.isListening && !isProcessing && !sessionEnded && !sessionEndedRef.current) {
-      // Resume listening with a natural pause - not too fast, not too slow
-      const timeout = setTimeout(() => {
-        if (!sessionEnded && !sessionEndedRef.current) { // Double check session hasn't ended
+    const handleStartConversation = () => {
+      console.log('🎤 VoiceManager: Received startConversation event');
+      
+      if (hasStarted || sessionEnded) {
+        console.log('⚠️ VoiceManager: Already started or ended, ignoring');
+        return;
+      }
+
+      console.log('🌟 VoiceManager: Starting voice conversation');
+      
+      // Get session manager and start the session (this starts the timer)
+      const sessionManager = sessionManagerRef.current;
+      
+      // Check if user can start session
+      if (!sessionManager.canStartSession()) {
+        console.log('❌ Cannot start session - payment required');
+        hasShownPaymentRef.current = true;
+        onRequirePayment?.();
+        return;
+      }
+      
+      // Start session timer
+      const sessionStarted = sessionManager.startSession();
+      console.log('📊 Session start result:', sessionStarted);
+      
+      if (!sessionStarted) {
+        console.log('❌ Failed to start session');
+        return;
+      }
+      
+      console.log('🟢 Session started successfully with timer!');
+      
+      // Mark as started
+      setHasStarted(true);
+      
+      const remainingTime = sessionManager.getRemainingFreeTime();
+      console.log('⏰ Remaining time after session start:', remainingTime);
+      
+      // IMMEDIATELY start speech recognition with user gesture
+      console.log('🎤 STARTING SPEECH RECOGNITION WITH USER GESTURE');
+      setTimeout(() => {
+        if (speechRecognition.isSupported && !speechRecognition.isListening) {
           speechRecognition.startListening();
         }
-      }, 2500); // Balanced 2.5 seconds - natural conversation pace
+      }, 100);
       
-      return () => clearTimeout(timeout);
-    }
-  }, [textToSpeech.isSpeaking, hasStarted, speechRecognition.isListening, isProcessing, speechRecognition, sessionEnded, sessionEndedRef]);
-
-  // Handle manual completion from button
-  useEffect(() => {
-    const handleManualComplete = () => {
-      const currentTranscript = speechRecognition.transcript.trim();
-      if (currentTranscript && !processingRef.current && !textToSpeech.isSpeaking && !sessionEnded && !sessionEndedRef.current) {
-        lastProcessedTranscript.current = currentTranscript;
-        speechRecognition.resetTranscript();
-        sendMessage(currentTranscript);
-      }
+      // Start greeting after speech recognition is established
+      console.log('👋 Starting greeting');
+      setTimeout(() => {
+        waitingForTTSRef.current = true;
+        
+        // if (remainingTime === 180) {
+        //   textToSpeech.speak("Hello, I'm Samantha. How can I help you today?");
+        // } else if (remainingTime > 0) {
+        //   textToSpeech.speak("Welcome back! Let's continue our conversation.");
+        // } else {
+        //   textToSpeech.speak("I'm sorry, your session time has expired.");
+        //   return;
+        // }
+      }, 500);
+      
+      console.log('🎯 Speech recognition started with user gesture');
     };
 
-    window.addEventListener('manualComplete', handleManualComplete);
+    window.addEventListener('startConversation', handleStartConversation);
     
     return () => {
-      window.removeEventListener('manualComplete', handleManualComplete);
+      window.removeEventListener('startConversation', handleStartConversation);
     };
-  }, [speechRecognition.transcript, sendMessage, textToSpeech.isSpeaking, speechRecognition, sessionEnded]);
+  }, [hasStarted, sessionEnded, textToSpeech, speechRecognition, onRequirePayment]);
 
-  // Request microphone permission and prepare for conversation
+  // Set isReady when component mounts (after intro)
   useEffect(() => {
-    const requestPermissionAndPrepare = async () => {
-      try {
-        // Request microphone permission
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-        
-        // Now that intro is complete, we can set ready immediately
+    if (isMounted && !isReady) {
+      // Wait for intro to complete before enabling interaction
+      const readyTimer = setTimeout(() => {
+        console.log('✅ VoiceManager: Setting isReady to true');
         setIsReady(true);
-      } catch (error) {
-        console.error('Microphone permission denied:', error);
-        onError?.('Microphone permission is required for voice interaction');
-      }
-    };
-
-    if (typeof window !== 'undefined' && 'navigator' in window) {
-      requestPermissionAndPrepare();
+      }, 8000); // Match intro duration
+      
+      return () => clearTimeout(readyTimer);
     }
-  }, [onError]);
+  }, [isMounted, isReady]);
 
-  // Check for browser support only after mounting
-  if (isMounted && (!speechRecognition.isSupported || !textToSpeech.isSupported)) {
-    return (
-      <div className="flex items-center justify-center min-h-screen gradient-rose-pink">
-        <div className="text-center p-8 bg-black/30 backdrop-blur-sm rounded-2xl shadow-lg border border-white/10">
-          <h2 className="text-2xl font-light text-white mb-4">
-            Browser Not Supported
-          </h2>
-          <p className="text-white/70">
-            This browser doesn&apos;t support voice recognition or text-to-speech. 
-            Please use a modern browser like Chrome, Firefox, or Safari.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Provide manual start listening function to parent (only once)
+  useEffect(() => {
+    if (onManualStartListening) {
+      const manualStart = () => {
+        console.log('🎤 Manual speech recognition start requested');
+        if (speechRecognition.isSupported && !speechRecognition.isListening) {
+          speechRecognition.startListening();
+        } else {
+          console.log('🚫 Cannot start manually - conditions not met');
+        }
+      };
+      onManualStartListening(manualStart);
+    }
+  }, [onManualStartListening]);
 
-  return null; // This component manages state but doesn&apos;t render anything
+  // MANUAL START: Only start when user clicks orbit (handled by startConversation event)
+  // No auto-start functionality here anymore
+
+  // Removed fallback mechanism to prevent restart loops
+
+  // DISABLED: Automatic restart after TTS (browser security constraint)
+  useEffect(() => {
+    if (waitingForTTSRef.current && !textToSpeech.isSpeaking && hasStarted && !sessionEnded) {
+      console.log('🔄 TTS finished - marking TTS wait as complete');
+      waitingForTTSRef.current = false;
+      
+      console.log('💡 User will need to click to restart speech recognition after TTS');
+    }
+  }, [textToSpeech.isSpeaking, hasStarted, sessionEnded]);
+
+  // Debug effect to monitor listening state
+  useEffect(() => {
+    if (hasStarted) {
+      console.log('🔍 Listening state debug:', {
+        shouldBeListening: shouldBeListeningRef.current,
+        isListening: speechRecognition.isListening,
+        isSpeaking: textToSpeech.isSpeaking,
+        isProcessing: processingRef.current,
+        waitingForTTS: waitingForTTSRef.current,
+        sessionEnded,
+        hasStarted,
+        timeSinceLastRestart: Date.now() - lastRestartTimeRef.current
+      });
+    }
+  }, [speechRecognition.isListening, textToSpeech.isSpeaking, sessionEnded, hasStarted]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      speechRecognition.stopListening();
+      textToSpeech.stop();
+      // Clear any pending listening timeouts
+      if (listeningTimeoutRef.current) {
+        clearTimeout(listeningTimeoutRef.current);
+        listeningTimeoutRef.current = null;
+      }
+      // Clear speech start timeout
+      // Clear speech keep-alive timeout
+    };
+  }, [speechRecognition, textToSpeech]);
+
+  return null;
 } 
