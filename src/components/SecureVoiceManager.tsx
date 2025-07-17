@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
-import { useOpenAIRealtime } from '@/hooks/useOpenAIRealtimeClean';
-import { useTextToSpeech } from '@/hooks/useTextToSpeech';
+import { useOpenAIRealtime } from '@/hooks/useOpenAIRealtime';
+import { useOpenAITTS } from '@/hooks/useOpenAITTS';
 import { getWalletAccessManager } from '@/lib/walletAccessManager';
 
 interface SecureVoiceManagerProps {
@@ -43,7 +43,7 @@ export default function SecureVoiceManager({
   const hasShownPaymentRef = useRef(false);
 
   const realtimeVoice = useOpenAIRealtime();
-  const textToSpeech = useTextToSpeech();
+  const textToSpeech = useOpenAITTS();
 
   // Refs for access status
   const onAccessStatusChangeRef = useRef(onAccessStatusChange);
@@ -123,18 +123,25 @@ export default function SecureVoiceManager({
   const isInCooldownRef = useRef<boolean>(false);
   const MAX_RESTART_ATTEMPTS = 3;
   const MAX_SILENT_ATTEMPTS = 3;
-  const SILENCE_TIMEOUT = 10000; // 10 seconds of silence before stopping
   const COOLDOWN_TIME = 30000; // 30 seconds cooldown after too many silent attempts
   const MAX_CONVERSATION_TIME = 30 * 60 * 1000; // 30 minutes max conversation
   const conversationStartTimeRef = useRef<number>(0);
 
-  // Helper to check if transcript is meaningful
+  // Helper to check if transcript is meaningful - much more permissive for natural conversation
   function isMeaningfulTranscript(transcript: string): boolean {
     if (!transcript || transcript.trim().length < 2) return false;
     const text = transcript.trim().toLowerCase();
-    const fillerWords = ['um', 'uh', 'ah', 'er', 'hmm', 'oh', 'yeah', 'okay', 'so', 'like', 'you know'];
-    const isFillerOnly = fillerWords.some(word => text.includes(word)) && text.length < 10;
-    return !isFillerOnly;
+    
+    // Only filter out obvious noise/technical terms, not natural speech patterns
+    const noiseWords = ['silence', 'noise', 'background', 'static', 'feedback', 'echo', 'breathing', 'sigh', 'cough', 'clear throat'];
+    
+    // Only reject if it's purely noise words and very short
+    if (noiseWords.some(word => text.includes(word)) && text.length < 5) {
+      return false;
+    }
+    
+    // Accept any speech that's not just noise - much more permissive
+    return true;
   }
 
   // Track successful voice input to reset silence detection
@@ -170,13 +177,9 @@ export default function SecureVoiceManager({
     }
   }, [realtimeVoice.transcript]);
 
-  // Handle TTS completion - restart listening with silence detection
+  // Handle continuous listening - restart when not listening and not speaking
   useEffect(() => {
-    if (!textToSpeech.isSpeaking && hasStarted && !sessionEnded && realtimeVoice.isConnected && !realtimeVoice.isListening) {
-      if (isInCooldownRef.current) {
-        console.log('⏸️ In cooldown, not restarting listening');
-        return;
-      }
+    if (hasStarted && !sessionEnded && realtimeVoice.isConnected && !realtimeVoice.isListening && !textToSpeech.isSpeaking) {
       // Only restart if we have access (paid) or trial is still active
       if (hasWalletAccess || (isTrialActive && trialTimeLeft > 0)) {
         // Check if conversation has been running too long
@@ -187,39 +190,19 @@ export default function SecureVoiceManager({
           onSessionEndedChangeRef.current?.(true);
           return;
         }
-        // Check if we've had recent user interaction (within last 30 seconds)
-        const timeSinceLastInteraction = Date.now() - lastUserInteractionRef.current;
-        const hasRecentInteraction = timeSinceLastInteraction < 30000; // 30 seconds
-        // Don't restart if too many failed attempts or no recent interaction
-        if (restartAttemptsRef.current >= MAX_RESTART_ATTEMPTS || !hasRecentInteraction) {
-          console.log('🛑 Not restarting: too many attempts or no recent interaction');
-          return;
-        }
-        // Don't restart if too many silent attempts
-        if (silentAttemptsRef.current >= MAX_SILENT_ATTEMPTS) {
-          console.log('⏸️ Too many silent attempts, not restarting listening');
-          return;
-        }
-        // Add a longer delay to prevent rapid restart loops and allow user to respond
-        const restartDelay = Math.min(2000 + (restartAttemptsRef.current * 1000), 5000);
+        
+        // Simple restart with short delay
+        const restartDelay = 500; // Much shorter delay for more responsive conversation
         setTimeout(() => {
           // Double-check conditions before restarting
-          if (hasStarted && !sessionEnded && !textToSpeech.isSpeaking && !realtimeVoice.isListening && !isInCooldownRef.current) {
-            console.log(`🔄 Restarting listening (attempt ${restartAttemptsRef.current + 1})`);
+          if (hasStarted && !sessionEnded && !textToSpeech.isSpeaking && !realtimeVoice.isListening) {
+            console.log('🔄 Restarting listening for continuous conversation');
             realtimeVoice.startListening();
-            restartAttemptsRef.current += 1;
-            // Set silence timeout to stop listening if no input
-            silenceTimeoutRef.current = setTimeout(() => {
-              if (realtimeVoice.isListening) {
-                console.log('🔇 Silence timeout - stopping listening');
-                realtimeVoice.stopListening();
-              }
-            }, SILENCE_TIMEOUT);
           }
         }, restartDelay);
       }
     }
-  }, [textToSpeech.isSpeaking, hasStarted, sessionEnded, realtimeVoice.isConnected, realtimeVoice.isListening, hasWalletAccess, isTrialActive, trialTimeLeft, MAX_CONVERSATION_TIME, realtimeVoice]);
+  }, [hasStarted, sessionEnded, realtimeVoice.isConnected, realtimeVoice.isListening, textToSpeech.isSpeaking, hasWalletAccess, isTrialActive, trialTimeLeft, realtimeVoice.startListening, MAX_CONVERSATION_TIME]);
 
   // Refs for manual start
   const onManualStartListeningRef = useRef(onManualStartListening);
@@ -240,7 +223,7 @@ export default function SecureVoiceManager({
     };
     
     onManualStartListeningRef.current?.(manualStart);
-  }, [realtimeVoice.isListening, realtimeVoice.isConnected, hasWalletAccess, isTrialActive, trialTimeLeft]);
+  }, [realtimeVoice.isListening, realtimeVoice.isConnected, hasWalletAccess, isTrialActive, trialTimeLeft, realtimeVoice.startListening]);
 
   // Track user interactions (clicks/touches) to prevent timeout
   useEffect(() => {

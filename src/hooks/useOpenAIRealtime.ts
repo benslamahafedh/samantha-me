@@ -29,37 +29,50 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
   const consecutiveSilentChunksRef = useRef<number>(0);
   const lastProcessingTimeRef = useRef<number>(0);
   const lastResponseRef = useRef<string>('');
-  const MAX_SILENT_CHUNKS = 3;
-  const PROCESSING_COOLDOWN = 2000; // 2 seconds between processing
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const PROCESSING_COOLDOWN = 200; // 0.2 seconds between processing for ultra-responsive conversation
+  const MIN_AUDIO_LEVEL = 0.01; // Minimum audio level threshold
 
-  // Helper function to check if text is meaningful
+  // Helper function to check if text is meaningful - much more permissive for natural conversation
   const isMeaningfulSpeech = useCallback((text: string): boolean => {
-    if (!text || text.trim().length < 3) return false;
+    if (!text || text.trim().length < 2) return false;
     
     const cleanText = text.trim().toLowerCase();
     
-    // Filter out common noise/background words
+    // Filter out silence, noise, and common false positives
     const noiseWords = [
-      'um', 'uh', 'hmm', 'ah', 'er', 'silence', 'noise', 'you', 'yeah', 'okay', 'so', 'like',
-      'background', 'static', 'feedback', 'echo', 'breathing', 'sigh', 'cough', 'clear throat'
+      'silence', 'noise', 'background', 'static', 'feedback', 'echo', 'breathing', 'sigh', 'cough', 'clear throat',
+      'please transcribe clearly and accurately', 'transcribe clearly', 'please transcribe', 'transcribe accurately'
     ];
     
-    // If it's just noise words, reject it
-    if (noiseWords.some(word => cleanText.includes(word)) && cleanText.length < 10) {
+    // Reject if it contains noise words
+    if (noiseWords.some(word => cleanText.includes(word))) {
+      console.log('🔇 Rejected noise/silence:', cleanText);
       return false;
     }
     
-    // Reject if it's the same as last processed transcript
+    // Reject if it's the same as last processed transcript (prevent duplicates)
     if (cleanText === lastProcessedTranscriptRef.current.toLowerCase()) {
+      console.log('🔄 Rejected duplicate:', cleanText);
       return false;
     }
     
-    // Must have at least 2 different words
-    const words = cleanText.split(/\s+/).filter(word => word.length > 1);
-    if (words.length < 2) {
+    // Reject if it's just punctuation or very short
+    if (cleanText.length < 3 || /^[.,!?;:]+$/.test(cleanText)) {
+      console.log('🔇 Rejected too short/punctuation:', cleanText);
       return false;
     }
     
+    // Reject if it's just repeated words or sounds
+    const words = cleanText.split(' ');
+    if (words.length === 1 && words[0].length < 4) {
+      console.log('🔇 Rejected single short word:', cleanText);
+      return false;
+    }
+    
+    // Accept speech that passes all filters
+    console.log('✅ Accepted meaningful speech:', cleanText);
     return true;
   }, []);
 
@@ -90,51 +103,102 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
     }
   }, [isSupported]);
 
-  // Speak response using browser TTS (keeping existing TTS for now)
-  const speakResponse = useCallback((text: string) => {
+  // Speak response using OpenAI TTS
+  const speakResponse = useCallback(async (text: string) => {
     if (!text.trim()) return;
     
-    setIsSpeaking(true);
-    
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 0.9;
-    utterance.pitch = 1.0;
-    utterance.volume = 0.8;
-    
-    // Try to find a good female voice
-    const voices = speechSynthesis.getVoices();
-    const femaleVoice = voices.find(voice => 
-      voice.lang.startsWith('en') && 
-      (voice.name.toLowerCase().includes('female') || 
-       voice.name.toLowerCase().includes('samantha') ||
-       voice.name.toLowerCase().includes('karen'))
-    ) || voices.find(voice => voice.lang.startsWith('en'));
-    
-    if (femaleVoice) {
-      utterance.voice = femaleVoice;
+    try {
+      setIsSpeaking(true);
+      
+      console.log('🎤 Sending response to OpenAI TTS:', text);
+
+      // Call our TTS API endpoint
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to generate speech');
+      }
+
+      // Get the audio blob and play it
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+
+      await audio.play();
+      
+    } catch (err) {
+      console.error('OpenAI TTS error:', err);
+      setIsSpeaking(false);
     }
-    
-    utterance.onend = () => {
-      setIsSpeaking(false);
-    };
-    
-    utterance.onerror = () => {
-      setIsSpeaking(false);
-    };
-    
-    speechSynthesis.speak(utterance);
   }, []);
 
   // Initialize audio recording using browser-compatible approach
   const startListening = useCallback(async () => {
+    console.log('🎤 Starting OpenAI Whisper-based listening (v2)');
     if (!isSupported || isListening) return;
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      // Enhanced audio constraints for better quality
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 44100,
+          channelCount: 1
+        } 
+      });
+      
+      // Set up audio analysis for level detection
+      const audioContext = new AudioContext();
+      const analyser = audioContext.createAnalyser();
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(analyser);
+      
+      analyser.fftSize = 256;
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      
+      audioContextRef.current = audioContext;
+      analyserRef.current = analyser;
+      
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm;codecs=opus'
+      });
       
       const audioChunks: Blob[] = [];
       const recordingStartTime = Date.now();
+      let hasAudioActivity = false;
+      
+      // Monitor audio levels during recording
+      const audioLevelCheck = setInterval(() => {
+        if (analyserRef.current) {
+          analyserRef.current.getByteFrequencyData(dataArray);
+          const average = dataArray.reduce((a, b) => a + b) / bufferLength;
+          const normalizedLevel = average / 255;
+          
+          if (normalizedLevel > MIN_AUDIO_LEVEL) {
+            hasAudioActivity = true;
+          }
+        }
+      }, 100);
       
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -143,6 +207,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
       };
       
       mediaRecorder.onstop = async () => {
+        clearInterval(audioLevelCheck);
         console.log('🎤 Audio recording stopped, processing...');
         
         if (audioChunks.length === 0) {
@@ -150,18 +215,26 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
           return;
         }
         
+        // Check if there was actual audio activity
+        if (!hasAudioActivity) {
+          console.log('🔇 No audio activity detected, skipping processing');
+          consecutiveSilentChunksRef.current += 1;
+          audioChunks.length = 0;
+          return;
+        }
+        
         try {
           // Combine all audio chunks
           const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
           
-          // Only process if we have substantial audio (> 1 second)
+          // Only process if we have substantial audio (> 1.5 seconds for better accuracy)
           const recordingDuration = Date.now() - recordingStartTime;
-          if (recordingDuration < 1000) {
+          if (recordingDuration < 1500) {
             console.log('⚠️ Recording too short, ignoring');
             return;
           }
           
-          console.log('🔄 Sending audio to Whisper for transcription...');
+          console.log('🔄 Sending audio to OpenAI Whisper for transcription (v2)...');
           
           // Send to Whisper API for transcription
           const formData = new FormData();
@@ -203,8 +276,9 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
               content: transcribedText
             });
             
-            // Process with GPT-4 (only if not already processing)
+            // Process with GPT-3.5-turbo (only if not already processing)
             if (!isProcessingRef.current) {
+              const startTime = Date.now();
               setIsProcessing(true);
               isProcessingRef.current = true;
               
@@ -239,6 +313,8 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
                   content: data.response
                 });
                 
+                const responseTime = Date.now() - startTime;
+                console.log(`⚡ Response generated in ${responseTime}ms`);
                 speakResponse(data.response);
                 
               } catch {
@@ -262,28 +338,34 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
         
         // Clear chunks for next recording
         audioChunks.length = 0;
+        
+        // Auto-restart listening for continuous conversation - more aggressive
+        setTimeout(() => {
+          console.log('🔄 Auto-restarting listening for continuous conversation');
+          startListening();
+        }, 200); // Short delay to ensure clean restart
       };
       
       mediaRecorderRef.current = mediaRecorder;
       
-      // Start recording in chunks (3 seconds each)
+      // Start recording in longer chunks (8 seconds each) for better transcription accuracy
       mediaRecorder.start();
       setIsListening(true);
       setError(null);
       
-      // Auto-stop after 3 seconds to get chunks
+      // Auto-stop after 8 seconds to get better chunks
       setTimeout(() => {
         if (mediaRecorderRef.current?.state === 'recording') {
           mediaRecorderRef.current.stop();
           setIsListening(false);
         }
-      }, 3000);
+      }, 8000);
       
     } catch {
       console.error('Failed to start listening');
       setError('Failed to start voice recognition');
     }
-  }, [isListening, isConnected, initializeWebSocket, isMeaningfulSpeech, MAX_SILENT_CHUNKS, PROCESSING_COOLDOWN, lastProcessingTimeRef, lastResponseRef, setIsProcessing, setTranscript, setError, setIsListening, speakResponse, conversationHistoryRef, isProcessingRef]);
+  }, [isListening, isConnected, initializeWebSocket, isMeaningfulSpeech, speakResponse, isSupported]);
 
   // Stop listening
   const stopListening = useCallback(() => {
@@ -347,6 +429,14 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
       isProcessingRef.current = false;
     }
   }, [setTranscript, isProcessingRef, setIsProcessing, conversationHistoryRef, speakResponse, setError]);
+
+  // Continuous listening effect - ensure we're always listening when connected
+  useEffect(() => {
+    if (isConnected && !isListening && !isSpeaking) {
+      console.log('🔄 Ensuring continuous listening is active (v2)');
+      startListening();
+    }
+  }, [isConnected, isListening, isSpeaking, startListening]);
 
   // Cleanup on unmount
   useEffect(() => {

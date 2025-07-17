@@ -28,17 +28,19 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
     const availableVoices = speechSynthesis.getVoices();
     setVoices(availableVoices);
 
-    // Try to find the best female voice for Samantha
+    // Try to find the best soft, human-like female voice for Samantha
     const preferredVoices = [
-      'Google UK English Female',
-      'Microsoft Zira Desktop',
-      'Samantha',
-      'Alex',
-      'Karen',
-      'Moira',
-      'Tessa',
-      'Veena',
-      'Fiona'
+      'Samantha', // macOS - soft and natural
+      'Google UK English Female', // Chrome - warm and clear
+      'Microsoft Zira Desktop', // Windows - friendly
+      'Alex', // macOS - natural and warm
+      'Karen', // Windows - soft and pleasant
+      'Moira', // macOS - gentle
+      'Tessa', // macOS - warm
+      'Veena', // Chrome - soft
+      'Fiona', // macOS - natural
+      'Google US English Female', // Chrome - clear and warm
+      'Microsoft Aria Desktop' // Windows - natural
     ];
 
     let bestVoice = null;
@@ -103,10 +105,10 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
       const utterance = new SpeechSynthesisUtterance(text);
       utteranceRef.current = utterance;
 
-      // Configure the utterance for a charming, intimate voice
-      utterance.rate = 0.9; // Natural speaking rate
-      utterance.pitch = 1.0; // Natural pitch
-      utterance.volume = 0.8; // Clear but soft volume
+      // Configure the utterance for a soft, warm, human-like voice
+      utterance.rate = 0.85; // Slightly slower for more warmth
+      utterance.pitch = 1.1; // Slightly higher pitch for softness
+      utterance.volume = 0.75; // Softer volume for intimacy
 
       if (selectedVoice) {
         utterance.voice = selectedVoice;

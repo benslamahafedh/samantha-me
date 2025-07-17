@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useOpenAIRealtime } from '@/hooks/useOpenAIRealtimeClean';
-import { useTextToSpeech } from '@/hooks/useTextToSpeech';
+import { useOpenAIRealtime } from '@/hooks/useOpenAIRealtime';
+import { useOpenAITTS } from '@/hooks/useOpenAITTS';
 import { getSessionManager } from '@/lib/sessionManager';
 
 interface VoiceManagerRealtimeProps {
@@ -39,7 +39,7 @@ export default function VoiceManagerRealtime({
   const hasShownPaymentRef = useRef(false);
 
   const realtimeVoice = useOpenAIRealtime();
-  const textToSpeech = useTextToSpeech();
+  const textToSpeech = useOpenAITTS();
 
   // Track if component has mounted on client side
   useEffect(() => {

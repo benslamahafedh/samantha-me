@@ -29,7 +29,6 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
   const consecutiveSilentChunksRef = useRef<number>(0);
   const lastProcessingTimeRef = useRef<number>(0);
   const lastResponseRef = useRef<string>('');
-  const MAX_SILENT_CHUNKS = 3;
   const PROCESSING_COOLDOWN = 2000; // 2 seconds between processing
 
   // Helper function to check if text is meaningful
@@ -283,7 +282,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
       console.error('Failed to start listening');
       setError('Failed to start voice recognition');
     }
-  }, [isListening, isConnected, initializeWebSocket, isMeaningfulSpeech, MAX_SILENT_CHUNKS, PROCESSING_COOLDOWN, lastProcessingTimeRef, lastResponseRef, setIsProcessing, setTranscript, setError, setIsListening, speakResponse, conversationHistoryRef, isProcessingRef, isSupported]);
+  }, [isListening, isConnected, initializeWebSocket, isMeaningfulSpeech, speakResponse, isSupported]);
 
   // Stop listening
   const stopListening = useCallback(() => {

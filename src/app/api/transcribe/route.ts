@@ -27,12 +27,14 @@ export async function POST(req: NextRequest) {
       type: audioFile.type || 'audio/wav'
     });
     
-    // Use OpenAI Whisper to transcribe the audio
+    // Use OpenAI Whisper to transcribe the audio with enhanced accuracy settings
     const transcription = await openai.audio.transcriptions.create({
       file: file,
-      model: 'whisper-1',
+      model: 'whisper-1', // Using the latest Whisper model for best accuracy
       language: 'en',
-      response_format: 'text'
+      response_format: 'text',
+      temperature: 0.1, // Very low temperature for maximum accuracy
+      prompt: "This is a conversation with an AI assistant named Samantha. The user is speaking naturally and conversationally. Please transcribe their words accurately, including proper names, technical terms, and casual speech patterns. Focus on clarity and accuracy over formatting."
     });
     
     return NextResponse.json({ 

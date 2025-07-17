@@ -1,8 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { useState, useCallback } from 'react';
 import SecureVoiceManager from '@/components/SecureVoiceManager';
 import VoiceVisualization from '@/components/VoiceVisualization';
 import PaymentModal from '@/components/PaymentModal';
@@ -20,19 +18,7 @@ export default function Home() {
   const [hasWalletAccess, setHasWalletAccess] = useState(false);
   const [isTrialActive, setIsTrialActive] = useState(false);
 
-  // Wallet connection state
-  const { connected } = useWallet();
 
-  // Check if wallet is available - client-side only to prevent hydration mismatch
-  const [isWalletAvailable, setIsWalletAvailable] = useState(false);
-  const [isClient, setIsClient] = useState(false);
-
-  useEffect(() => {
-    setIsClient(true);
-    // Check for wallet availability on client side only
-    const hasWallet = !!(window as unknown as Record<string, unknown>).solana || !!(window as unknown as Record<string, unknown>).phantom || !!(window as unknown as Record<string, unknown>).solflare;
-    setIsWalletAvailable(hasWallet);
-  }, []);
 
 
 
@@ -143,47 +129,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* Wallet status indicator */}
-        {isClient && hasStarted && (
-          <div className="fixed bottom-4 right-4 z-20">
-            <div className="bg-black/30 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10">
-              <div className="flex items-center space-x-2 text-white/60 text-xs">
-                <div className={`w-2 h-2 rounded-full ${hasWalletAccess ? 'bg-green-400' : connected ? 'bg-blue-400' : 'bg-yellow-400'}`}></div>
-                <span>
-                  {hasWalletAccess ? 'Verified Payment' : connected ? 'Wallet Connected' : isTrialActive ? 'Trial Active' : 'Connect Wallet'}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Development mode indicator */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-20">
-            <div className="bg-yellow-500/20 backdrop-blur-sm rounded-full px-3 py-1 border border-yellow-500/30">
-              <span className="text-yellow-200 text-xs font-medium">DEV MODE</span>
-            </div>
-          </div>
-        )}
-
-        {/* Wallet connection button - only show when not connected and not in trial */}
-        {isClient && !connected && !isTrialActive && !hasWalletAccess && isWalletAvailable && (
-          <div className="fixed top-4 left-4 z-20">
-            <WalletMultiButton className="!bg-gradient-to-r !from-rose-500 !to-pink-500 !text-white !border !border-white/20 !rounded-full !px-4 !py-2 !text-sm !font-medium hover:!from-rose-600 hover:!to-pink-600 transition-all duration-300" />
-          </div>
-        )}
-
-        {/* Wallet not available message */}
-        {isClient && !connected && !isTrialActive && !hasWalletAccess && !isWalletAvailable && (
-          <div className="fixed top-4 left-4 z-20">
-            <div className="bg-black/30 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10">
-              <div className="flex items-center space-x-2 text-white/60 text-xs">
-                <div className="w-2 h-2 rounded-full bg-yellow-400"></div>
-                <span>Install Phantom or Solflare wallet</span>
-              </div>
-            </div>
-          </div>
-        )}
       </main>
     </WalletProvider>
   );

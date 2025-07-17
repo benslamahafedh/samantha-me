@@ -215,7 +215,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
     } catch (error) {
       console.error('Failed to stop speech recognition:', error);
     }
-  }, [isSupported]);
+  }, [isSupported, isListening]);
 
   const resetTranscript = useCallback(() => {
     setTranscript('');
@@ -227,8 +227,9 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
       if (recognitionRef.current) {
         (recognitionRef.current as unknown as SpeechRecognition).stop();
       }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+      const timeout = timeoutRef.current;
+      if (timeout) {
+        clearTimeout(timeout);
       }
     };
   }, []);
