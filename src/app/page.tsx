@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import SecureVoiceManager from '@/components/SecureVoiceManager';
 import VoiceVisualization from '@/components/VoiceVisualization';
 import PaymentModal from '@/components/PaymentModal';
@@ -18,8 +18,78 @@ export default function Home() {
   const [hasWalletAccess, setHasWalletAccess] = useState(false);
   const [isTrialActive, setIsTrialActive] = useState(false);
 
+  // Mobile-specific fixes to prevent interference with voice interaction
+  useEffect(() => {
+    // Prevent text selection and touch highlighting
+    const preventSelection = (e: Event) => {
+      e.preventDefault();
+      return false;
+    };
 
+    // Prevent zoom on double tap
+    let lastTouchEnd = 0;
+    const preventZoom = (e: TouchEvent) => {
+      const now = (new Date()).getTime();
+      if (now - lastTouchEnd <= 300) {
+        e.preventDefault();
+      }
+      lastTouchEnd = now;
+    };
 
+    // Prevent pull-to-refresh
+    const preventPullToRefresh = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      
+      const touch = e.touches[0];
+      const startY = touch.clientY;
+      
+      const handleTouchMove = (e: TouchEvent) => {
+        const touch = e.touches[0];
+        const currentY = touch.clientY;
+        const diff = currentY - startY;
+        
+        if (diff > 0 && window.scrollY === 0) {
+          e.preventDefault();
+        }
+      };
+      
+      document.addEventListener('touchmove', handleTouchMove, { passive: false });
+      
+      const handleTouchEnd = () => {
+        document.removeEventListener('touchmove', handleTouchMove);
+        document.removeEventListener('touchend', handleTouchEnd);
+      };
+      
+      document.addEventListener('touchend', handleTouchEnd);
+    };
+
+    // Apply mobile fixes
+    document.addEventListener('selectstart', preventSelection);
+    document.addEventListener('dragstart', preventSelection);
+    document.addEventListener('contextmenu', preventSelection);
+    document.addEventListener('touchend', preventZoom);
+    document.addEventListener('touchstart', preventPullToRefresh);
+
+    // Ensure proper microphone access on iOS
+    if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
+      // Request microphone permission early
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(() => {
+          console.log('Microphone access granted on iOS');
+        })
+        .catch((err) => {
+          console.log('Microphone access not granted:', err);
+        });
+    }
+
+    return () => {
+      document.removeEventListener('selectstart', preventSelection);
+      document.removeEventListener('dragstart', preventSelection);
+      document.removeEventListener('contextmenu', preventSelection);
+      document.removeEventListener('touchend', preventZoom);
+      document.removeEventListener('touchstart', preventPullToRefresh);
+    };
+  }, []);
 
 
   const handleHasStartedChange = (started: boolean) => {
@@ -66,8 +136,8 @@ export default function Home() {
 
   return (
     <WalletProvider>
-      <main className="relative min-h-screen overflow-hidden">
-        <div className="relative min-h-screen">
+      <main className="relative min-h-screen overflow-hidden select-none touch-none">
+        <div className="relative min-h-screen select-none touch-none">
           <VoiceVisualization
             isListening={isListening}
             isSpeaking={isSpeaking}

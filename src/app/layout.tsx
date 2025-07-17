@@ -8,7 +8,7 @@ export const metadata: Metadata = {
   description: "A beautiful voice-only assistant Powered by OMNIAOS. Speak naturally to begin an intimate conversation.",
   keywords: ["voice assistant", "AI", "conversation", "Her", "Samantha"],
   authors: [{ name: "Voice Assistant" }],
-  viewport: "width=device-width, initial-scale=1",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
   themeColor: "#f43f5e",
   manifest: "/manifest.json",
   openGraph: {
