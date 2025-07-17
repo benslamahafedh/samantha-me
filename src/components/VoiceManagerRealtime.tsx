@@ -83,17 +83,17 @@ export default function VoiceManagerRealtime({
     return () => {
       console.log('🧹 VoiceManagerRealtime: Cleanup called but not destroying SessionManager');
     };
-  }, []);
+  }, [onSessionEndedChange, onSessionTimeChange, realtimeVoice, textToSpeech]);
 
   // Notify parent of hasStarted changes
   useEffect(() => {
     onHasStartedChange?.(hasStarted);
-  }, [hasStarted]);
+  }, [hasStarted, onHasStartedChange]);
 
   // Notify parent of isReady changes
   useEffect(() => {
     onIsReadyChange?.(isReady);
-  }, [isReady]);
+  }, [isReady, onIsReadyChange]);
 
   // Set ready state when realtime is supported and connected
   useEffect(() => {
@@ -106,18 +106,18 @@ export default function VoiceManagerRealtime({
   useEffect(() => {
     // Pass the current transcript string, not the whole object
     onTranscriptChange?.(realtimeVoice.transcript || '');
-  }, [realtimeVoice.transcript]);
+  }, [realtimeVoice.transcript, onTranscriptChange]);
 
   // Handle speaking changes - combine realtime and TTS speaking states
   useEffect(() => {
     const isSpeaking = realtimeVoice.isSpeaking || textToSpeech.isSpeaking;
     onSpeakingChange?.(isSpeaking);
-  }, [realtimeVoice.isSpeaking, textToSpeech.isSpeaking]);
+  }, [realtimeVoice.isSpeaking, textToSpeech.isSpeaking, onSpeakingChange]);
 
   // Handle listening changes
   useEffect(() => {
     onListeningChange?.(realtimeVoice.isListening);
-  }, [realtimeVoice.isListening]);
+  }, [realtimeVoice.isListening, onListeningChange]);
 
   // Handle errors from realtime API
   useEffect(() => {
@@ -125,14 +125,14 @@ export default function VoiceManagerRealtime({
       console.error('❌ Realtime API Error:', realtimeVoice.error);
       onError?.(realtimeVoice.error);
     }
-  }, [realtimeVoice.error]);
+  }, [realtimeVoice.error, onError]);
 
   // Handle errors from TTS
   useEffect(() => {
     if (textToSpeech.error) {
       onError?.(textToSpeech.error);
     }
-  }, [textToSpeech.error]);
+  }, [textToSpeech.error, onError]);
 
   // Provide manual start function to parent
   useEffect(() => {
@@ -144,7 +144,7 @@ export default function VoiceManagerRealtime({
     };
     
     onManualStartListening?.(manualStart);
-  }, [realtimeVoice.isListening, realtimeVoice.isConnected]);
+  }, [realtimeVoice.isListening, realtimeVoice.isConnected, onManualStartListening, realtimeVoice]);
 
   // Handle conversation start event
   useEffect(() => {
@@ -216,7 +216,7 @@ export default function VoiceManagerRealtime({
     return () => {
       window.removeEventListener('startConversation', handleStartConversation);
     };
-  }, [hasStarted, sessionEnded]);
+  }, [hasStarted, sessionEnded, onRequirePayment, realtimeVoice]);
 
   // Handle TTS completion - restart listening
   useEffect(() => {
@@ -226,7 +226,7 @@ export default function VoiceManagerRealtime({
         realtimeVoice.startListening();
       }, 500);
     }
-  }, [textToSpeech.isSpeaking, hasStarted, sessionEnded, realtimeVoice.isConnected, realtimeVoice.isListening]);
+  }, [textToSpeech.isSpeaking, hasStarted, sessionEnded, realtimeVoice.isConnected, realtimeVoice.isListening, onError, onRequirePayment, realtimeVoice]);
 
   // Debug logging for state changes
   useEffect(() => {

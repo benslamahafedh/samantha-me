@@ -283,7 +283,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
       console.error('Failed to start listening');
       setError('Failed to start voice recognition');
     }
-  }, [isListening, isConnected, initializeWebSocket, isMeaningfulSpeech, MAX_SILENT_CHUNKS, PROCESSING_COOLDOWN, lastProcessingTimeRef, lastResponseRef, setIsProcessing, setTranscript, setError, setIsListening, speakResponse, conversationHistoryRef, isProcessingRef]);
+  }, [isListening, isConnected, initializeWebSocket, isMeaningfulSpeech, MAX_SILENT_CHUNKS, PROCESSING_COOLDOWN, lastProcessingTimeRef, lastResponseRef, setIsProcessing, setTranscript, setError, setIsListening, speakResponse, conversationHistoryRef, isProcessingRef, isSupported]);
 
   // Stop listening
   const stopListening = useCallback(() => {

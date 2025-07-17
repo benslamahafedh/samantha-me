@@ -219,7 +219,7 @@ export default function SecureVoiceManager({
         }, restartDelay);
       }
     }
-  }, [textToSpeech.isSpeaking, hasStarted, sessionEnded, realtimeVoice.isConnected, realtimeVoice.isListening, hasWalletAccess, isTrialActive, trialTimeLeft, MAX_CONVERSATION_TIME]);
+  }, [textToSpeech.isSpeaking, hasStarted, sessionEnded, realtimeVoice.isConnected, realtimeVoice.isListening, hasWalletAccess, isTrialActive, trialTimeLeft, MAX_CONVERSATION_TIME, realtimeVoice]);
 
   // Refs for manual start
   const onManualStartListeningRef = useRef(onManualStartListening);
@@ -395,21 +395,19 @@ export default function SecureVoiceManager({
     if (!hasStarted || sessionEnded) return;
 
     const timer = setInterval(() => {
-      setSessionTimeLeft(prev => {
-        const newTime = prev - 1;
-        if (newTime <= 0) {
-          clearInterval(timer);
-          setSessionEnded(true);
-          onSessionEndedChange?.(true);
-          return 0;
-        }
-        onSessionTimeChange?.(newTime);
-        return newTime;
-      });
+      const newTime = trialTimeLeft - 1;
+      if (newTime <= 0) {
+        clearInterval(timer);
+        setSessionEnded(true);
+        onSessionEndedChange?.(true);
+        return;
+      }
+      setTrialTimeLeft(newTime);
+      onSessionTimeChange?.(newTime);
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [hasStarted, sessionEnded, onSessionEndedChange, onSessionTimeChange, MAX_CONVERSATION_TIME, realtimeVoice]);
+  }, [hasStarted, sessionEnded, onSessionEndedChange, onSessionTimeChange, MAX_CONVERSATION_TIME, realtimeVoice, trialTimeLeft]);
 
   // Don't render anything - this is a headless component
   return null;

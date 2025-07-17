@@ -34,7 +34,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
       console.error('Failed to start speech recognition:', error);
       setError('Failed to start voice recognition');
     }
-  }, [isSupported, isListening, startSpeechRecognition]);
+  }, [isSupported, isListening]);
 
   const startSpeechRecognition = useCallback(() => {
     console.log('🧹 Cleaning up existing recognition');
@@ -210,12 +210,12 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
     
     try {
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        (recognitionRef.current as unknown as SpeechRecognition).stop();
       }
     } catch (error) {
       console.error('Failed to stop speech recognition:', error);
     }
-  }, [isSupported, isListening]);
+  }, [isSupported]);
 
   const resetTranscript = useCallback(() => {
     setTranscript('');
