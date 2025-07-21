@@ -99,7 +99,6 @@ export default function VoiceManager({
       // across component re-renders. Destroying it clears the timer.
       console.log('🧹 VoiceManager: Cleanup called but not destroying SessionManager');
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Notify parent of hasStarted changes
