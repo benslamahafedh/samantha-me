@@ -90,78 +90,98 @@ export const useTextToSpeech = (): UseTextToSpeechReturn => {
     };
   }, [isSupported, loadVoices]);
 
-  const speak = useCallback((text: string) => {
-    if (!isSupported) {
-      setError('Text-to-speech is not supported in this browser');
-      return;
-    }
-
-    if (!text.trim()) return;
-
-    // Stop any current speech
-    speechSynthesis.cancel();
+  const speak = useCallback(async (text: string) => {
+    if (isSpeaking || !text.trim()) return;
 
     try {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utteranceRef.current = utterance;
+      setIsSpeaking(true);
+      setError(null);
 
-      // Configure the utterance for a soft, warm, human-like voice
-      utterance.rate = 0.85; // Slightly slower for more warmth
-      utterance.pitch = 1.1; // Slightly higher pitch for softness
-      utterance.volume = 0.75; // Softer volume for intimacy
-
-      if (selectedVoice) {
-        utterance.voice = selectedVoice;
+      // iOS Audio Session Configuration for TTS
+      if (typeof window !== 'undefined' && 'webkitAudioContext' in window) {
+        const audioContext = new (window as any).webkitAudioContext();
+        
+        // Configure audio session for iOS TTS
+        if (audioContext.setAudioSessionConfiguration) {
+          try {
+            await audioContext.setAudioSessionConfiguration({
+              category: 'playback',
+              mode: 'default',
+              options: ['defaultToSpeaker', 'allowBluetooth', 'allowBluetoothA2DP']
+            });
+          } catch (e) {
+            console.log('iOS TTS audio session config not available:', e);
+          }
+        }
+        
+        // Resume audio context if suspended
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
       }
 
-      utterance.onstart = () => {
-        setIsSpeaking(true);
-        setError(null);
-      };
-
-      utterance.onend = () => {
-        setIsSpeaking(false);
-      };
-
-      utterance.onerror = (event) => {
-        // Handle specific errors gracefully
-        if (event.error === 'interrupted' || event.error === 'canceled') {
-          // Don't show error for interrupted/canceled - usually intentional
-          setIsSpeaking(false);
-          return;
-        }
+      // iOS-specific: Force audio output to speaker
+      if (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) {
+        // Try to set audio output to speaker using Web Audio API
+        const audioContext = new (window as any).AudioContext();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
         
-        if (event.error === 'network') {
-          setError('Voice synthesis network issue');
-          setIsSpeaking(false);
-          return;
-        }
+        // Set gain to 0 to make it silent but still activate audio session
+        gainNode.gain.setValueAtTime(0, audioContext.currentTime);
         
-        if (event.error === 'synthesis-unavailable') {
-          setError('Voice synthesis temporarily unavailable');
-          setIsSpeaking(false);
-          return;
-        }
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
         
-        // Only log other errors to console, don't show to user
-        console.log('Speech synthesis error:', event.error);
+        // Start and stop immediately to activate audio session
+        oscillator.start();
+        oscillator.stop(audioContext.currentTime + 0.001);
+      }
+
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        throw new Error('TTS request failed');
+      }
+
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+
+      // iOS-specific audio settings
+      if (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) {
+        audio.volume = 1.0; // Ensure full volume
+        // Try to force audio output to speaker
+        if ('webkitAudioContext' in window) {
+          audio.setAttribute('playsinline', 'false');
+        }
+      }
+
+      audio.onended = () => {
         setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
       };
 
-      utterance.onpause = () => {
+      audio.onerror = () => {
         setIsSpeaking(false);
+        setError('Failed to play audio');
+        URL.revokeObjectURL(audioUrl);
       };
 
-      utterance.onresume = () => {
-        setIsSpeaking(true);
-      };
+      await audio.play();
 
-      speechSynthesis.speak(utterance);
-    } catch {
-      setError('Failed to synthesize speech');
+    } catch (error) {
+      console.error('TTS error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to speak');
       setIsSpeaking(false);
     }
-  }, [isSupported, selectedVoice]);
+  }, [isSpeaking]);
 
   const stop = useCallback(() => {
     if (isSupported) {

@@ -117,6 +117,27 @@ export default function VoiceVisualization({
 
   const isActive = isHovering || isTouching;
 
+  // Check if user is on iOS
+  const isIOS = typeof window !== 'undefined' && (
+    navigator.userAgent.includes('iPhone') || 
+    navigator.userAgent.includes('iPad') || 
+    navigator.userAgent.includes('iPod')
+  );
+
+  // Show iOS audio instructions
+  const [showIOSInstructions, setShowIOSInstructions] = useState(false);
+
+  useEffect(() => {
+    if (isIOS && isReady && !hasStarted) {
+      // Show iOS instructions after a delay
+      const timer = setTimeout(() => {
+        setShowIOSInstructions(true);
+      }, 2000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isIOS, isReady, hasStarted]);
+
   return (
     <div className="flex flex-col items-center justify-center h-screen w-screen overflow-hidden p-4 sm:p-8 gradient-rose-pink">
       <div className="relative flex flex-col items-center max-w-2xl w-full">
@@ -1190,6 +1211,53 @@ export default function VoiceVisualization({
           </motion.div>
         )}
       </div>
+
+      {/* iOS Audio Instructions */}
+      {showIOSInstructions && isIOS && (
+        <motion.div
+          className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+        >
+          <div className="bg-black/80 backdrop-blur-sm rounded-2xl p-6 max-w-sm mx-4 border border-white/20">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
+                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <h3 className="text-white font-semibold">iPhone Audio Setup</h3>
+            </div>
+            
+            <p className="text-white/80 text-sm mb-4">
+              To use Samantha on your iPhone, please ensure audio is enabled:
+            </p>
+            
+            <div className="space-y-2 text-sm text-white/70">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span>Turn off silent mode (flip the switch on the side)</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span>Allow microphone access when prompted</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                <span>Ensure volume is turned up</span>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => setShowIOSInstructions(false)}
+              className="mt-4 w-full bg-white/20 text-white py-2 rounded-lg hover:bg-white/30 transition-colors text-sm"
+            >
+              Got it
+            </button>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 } 

@@ -198,165 +198,155 @@ export function useFastVoiceProcessing(): FastVoiceProcessingReturn {
 
   // Start listening with optimized settings
   const startListening = useCallback(async () => {
-    if (!isSupported || isStartingListeningRef.current) {
-      return;
-    }
-
-    // Reset speaking state to ensure we can start listening
-    isSpeakingRef.current = false;
-    setIsSpeaking(false);
-    isStartingListeningRef.current = true;
+    if (isListening || isProcessing) return;
 
     try {
+      // iOS Audio Session Configuration - Bypass Silent Mode
+      if (typeof window !== 'undefined' && 'webkitAudioContext' in window) {
+        const audioContext = new (window as any).webkitAudioContext();
+        
+        // Configure audio session for iOS
+        if (audioContext.setAudioSessionConfiguration) {
+          try {
+            await audioContext.setAudioSessionConfiguration({
+              category: 'playAndRecord',
+              mode: 'voiceChat',
+              options: ['allowBluetooth', 'allowBluetoothA2DP', 'defaultToSpeaker']
+            });
+          } catch (e) {
+            console.log('iOS audio session config not available:', e);
+          }
+        }
+        
+        // Resume audio context if suspended
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+      }
+
+      // Request microphone access with specific constraints for iOS
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
-          sampleRate: 16000,
-          channelCount: 1
+          sampleRate: 44100,
+          channelCount: 1,
+          // iOS-specific options
+          ...(navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad') ? {
+            // Force audio input even in silent mode
+            mandatory: {
+              googEchoCancellation: true,
+              googAutoGainControl: true,
+              googNoiseSuppression: true,
+              googHighpassFilter: true,
+              googTypingNoiseDetection: true,
+              googAudioMirroring: false
+            }
+          } : {})
         }
       });
 
       setIsListening(true);
       setError(null);
 
-      const audioChunks: Blob[] = [];
-      const recordingStartTime = Date.now();
-      
+      // Create MediaRecorder with iOS-optimized settings
       const mediaRecorder = new MediaRecorder(stream, {
         mimeType: 'audio/webm;codecs=opus',
-        audioBitsPerSecond: 32000
+        audioBitsPerSecond: 128000
       });
-      
+
+      // iOS-specific: Force audio output to speaker
+      if (navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')) {
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length > 0) {
+          const audioTrack = audioTracks[0];
+          // Try to set audio output to speaker
+          if (audioTrack.getSettings) {
+            const settings = audioTrack.getSettings();
+            console.log('iOS Audio track settings:', settings);
+          }
+        }
+      }
+
+      const audioChunks: Blob[] = [];
+      let recordingStartTime = Date.now();
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           audioChunks.push(event.data);
         }
       };
-      
+
       mediaRecorder.onstop = async () => {
-        // Don't process if Samantha is speaking
-        if (isSpeakingRef.current) {
-          audioChunks.length = 0;
-          return;
-        }
-        
-        if (audioChunks.length === 0) {
-          return;
-        }
-        
-        try {
-          // Combine all audio chunks
-          const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-          
-          // Check recording duration
-          const recordingDuration = Date.now() - recordingStartTime;
-          
-          // Only process if we have substantial audio (at least 1 second)
-          if (recordingDuration < 1000) {
-            audioChunks.length = 0;
-            // Restart listening immediately
-            setTimeout(() => {
-              if (!isProcessingRef.current && !isSpeakingRef.current) {
-                setIsListening(false);
-                startListening();
-              }
-            }, 500);
-            return;
-          }
-          
-          // Double-check that Samantha is not speaking before processing
-          if (isSpeakingRef.current) {
-            audioChunks.length = 0;
-            return;
-          }
-          
-          // Send to Whisper API for transcription
-          const formData = new FormData();
-          formData.append('audio', audioBlob, 'recording.webm');
-          
-          const response = await fetch('/api/transcribe', {
-            method: 'POST',
-            body: formData
-          });
-          
-          if (!response.ok) {
-            throw new Error('Transcription failed');
-          }
-          
-          const transcriptionData = await response.json();
-          const transcribedText = transcriptionData.text?.trim();
-          
-          // Check if this is meaningful speech
-          if (transcribedText && isMeaningfulSpeech(transcribedText)) {
-            // Check cooldown to prevent multiple responses
-            const timeSinceLastProcessing = Date.now() - lastProcessingTimeRef.current;
-            if (timeSinceLastProcessing < PROCESSING_COOLDOWN) {
-              return;
+        if (audioChunks.length === 0) return;
+
+        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+        const duration = Date.now() - recordingStartTime;
+
+        // Process audio if it's long enough
+        if (duration >= 800) {
+          try {
+            // Send to Whisper API for transcription
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'recording.webm');
+            
+            const response = await fetch('/api/transcribe', {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (!response.ok) {
+              throw new Error('Transcription failed');
             }
             
-            // Don't process if Samantha is currently speaking
-            if (isSpeakingRef.current) {
-              return;
-            }
+            const transcriptionData = await response.json();
+            const transcribedText = transcriptionData.text?.trim();
             
-            consecutiveSilentChunksRef.current = 0;
-            lastProcessedTranscriptRef.current = transcribedText;
-            lastProcessingTimeRef.current = Date.now();
-            setTranscript(transcribedText);
-            
-            // Process with fast chat
-            if (!isProcessingRef.current && processChatFastRef.current) {
-              setIsProcessing(true);
-              isProcessingRef.current = true;
+            // Check if this is meaningful speech
+            if (transcribedText && isMeaningfulSpeech(transcribedText)) {
+              setTranscript(transcribedText);
               
-              try {
-                await processChatFastRef.current(transcribedText);
-              } finally {
-                setIsProcessing(false);
-                isProcessingRef.current = false;
+              // Process with fast chat
+              if (!isProcessingRef.current && processChatFastRef.current) {
+                setIsProcessing(true);
+                isProcessingRef.current = true;
+                
+                try {
+                  await processChatFastRef.current(transcribedText);
+                } finally {
+                  setIsProcessing(false);
+                  isProcessingRef.current = false;
+                }
               }
             }
-          } else {
-            consecutiveSilentChunksRef.current += 1;
+          } catch (error) {
+            console.error('Failed to process audio:', error);
+            setError('Failed to process voice input');
           }
-          
-        } catch {
-          setError('Failed to process voice input');
-          consecutiveSilentChunksRef.current += 1;
         }
-        
-        // Clear chunks for next recording
-        audioChunks.length = 0;
-        
-        // Restart listening after processing
-        setTimeout(() => {
-          if (!isProcessingRef.current && !isSpeakingRef.current) {
-            setIsListening(false);
-            startListening();
-          }
-        }, 1000);
+
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop());
+        setIsListening(false);
       };
-      
-      mediaRecorderRef.current = mediaRecorder;
-      
-      // Start recording for 3 seconds
+
+      // Start recording with fixed duration for iOS compatibility
       mediaRecorder.start();
       
-      // Stop recording after 3 seconds
+      // Stop recording after 3 seconds (iOS-friendly duration)
       setTimeout(() => {
-        if (mediaRecorderRef.current?.state === 'recording') {
-          mediaRecorderRef.current.stop();
+        if (mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
         }
       }, 3000);
-      
-    } catch {
-      setError('Failed to access microphone');
-    } finally {
-      isStartingListeningRef.current = false;
+
+    } catch (error) {
+      console.error('Failed to start listening:', error);
+      setError(error instanceof Error ? error.message : 'Failed to start listening');
+      setIsListening(false);
     }
-  }, [isSupported, isMeaningfulSpeech]);
+  }, [isListening, isProcessing, isMeaningfulSpeech]);
 
   // Stop listening
   const stopListening = useCallback(() => {

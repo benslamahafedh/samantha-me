@@ -11,6 +11,16 @@ export const metadata: Metadata = {
   viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
   themeColor: "#f43f5e",
   manifest: "/manifest.json",
+  // iOS-specific meta tags for audio
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "black-translucent",
+    "apple-mobile-web-app-title": "Samantha",
+    // Audio session configuration
+    "audio-session-category": "playAndRecord",
+    "audio-session-mode": "voiceChat",
+    "audio-session-options": "defaultToSpeaker,allowBluetooth,allowBluetoothA2DP"
+  },
   openGraph: {
     title: "Samantha - Voice Assistant",
     description: "A beautiful voice-only assistant Powered by OMNIAOS",
