@@ -1,310 +1,303 @@
-/**
- * Bulletproof Session Manager
- * Handles session timing, state persistence, and access control
- */
+import { Database } from './database';
+import crypto from 'crypto';
 
 interface SessionData {
-  userId: string;
-  sessionStartTime: number;
-  sessionEndTime: number;
-  totalTimeUsed: number;
-  isPaid: boolean;
-  walletAddress?: string;
-  paymentTransactionId?: string;
-  lastAccessTime: number;
+  sessionId: string;
+  createdAt: Date;
+  lastActivity: Date;
+  expiresAt: Date;
+  userAgent: string;
+  ipAddress: string;
 }
 
-const SESSION_KEY_PREFIX = 'samantha_session_';
-const SESSION_DURATION = 180; // 3 minutes in seconds
+// SECURITY FIX: Server-side session storage with expiration
+declare global {
+  var activeSessions: Map<string, SessionData> | undefined;
+}
+
+if (!global.activeSessions) {
+  global.activeSessions = new Map();
+}
 
 export class SessionManager {
-  private sessionData: SessionData | null = null;
-  private _timerId: NodeJS.Timeout | null = null;
-  private storageKey: string;
-  private onSessionEndCallbacks: (() => void)[] = [];
-  private onTimeUpdateCallbacks: ((timeLeft: number) => void)[] = [];
-  private isClient: boolean;
-  private instanceId: string;
+  private static instance: SessionManager;
+  private database: Database;
+  private sessions: Map<string, SessionData>;
+  private readonly SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
+  private readonly TRIAL_DURATION = 3 * 60 * 1000; // 3 minutes
+  private readonly PAID_DURATION = 60 * 60 * 1000; // 1 hour
 
-  // Add getter/setter to track timer changes
-  private get timerId(): NodeJS.Timeout | null {
-    return this._timerId;
-  }
-
-  private set timerId(value: NodeJS.Timeout | null) {
-    const stack = new Error().stack;
-    console.log(`🔧 SessionManager[${this.instanceId}]: Timer ID changing from ${this._timerId} to ${value}`);
-    console.log(`📍 Call stack:`, stack?.split('\n').slice(1, 4));
-    this._timerId = value;
-  }
-
-  constructor() {
-    this.instanceId = Math.random().toString(36).substring(2, 8);
-    console.log(`🏗️ SessionManager: Creating new instance ${this.instanceId}`);
+  private constructor() {
+    this.database = Database.getInstance();
+    this.sessions = global.activeSessions!;
     
-    this.isClient = typeof window !== 'undefined';
-    // Generate unique user ID if not exists
-    this.storageKey = this.getStorageKey();
-    if (this.isClient) {
-      this.loadSession();
+    // Clean up expired sessions periodically
+    setInterval(() => this.cleanupExpiredSessions(), 5 * 60 * 1000); // Every 5 minutes
+  }
+
+  public static getInstance(): SessionManager {
+    if (!SessionManager.instance) {
+      SessionManager.instance = new SessionManager();
     }
+    return SessionManager.instance;
   }
 
-  private getStorageKey(): string {
-    if (!this.isClient) return '';
+  // SECURITY FIX: Generate cryptographically secure session IDs
+  private generateSecureSessionId(): string {
+    return crypto.randomBytes(32).toString('hex');
+  }
+
+  // SECURITY FIX: Validate session with proper checks
+  async validateSession(sessionId: string, userAgent?: string, ipAddress?: string): Promise<boolean> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+
+    const now = new Date();
     
-    // Get or create unique device ID
-    let deviceId = localStorage.getItem('samantha_device_id');
-    if (!deviceId) {
-      deviceId = this.generateDeviceId();
-      localStorage.setItem('samantha_device_id', deviceId);
+    // Check if session has expired
+    if (now > session.expiresAt) {
+      this.sessions.delete(sessionId);
+      return false;
     }
-    return `${SESSION_KEY_PREFIX}${deviceId}`;
+
+    // SECURITY FIX: Validate user agent and IP (optional but recommended)
+    if (userAgent && session.userAgent !== userAgent) {
+      console.warn('Session validation failed: User agent mismatch');
+      return false;
   }
 
-  private generateDeviceId(): string {
-    // Generate unique device ID based on browser fingerprint
-    const fingerprint = [
-      navigator.userAgent,
-      navigator.language,
-      new Date().getTimezoneOffset(),
-      screen.width,
-      screen.height,
-      screen.colorDepth,
-      navigator.hardwareConcurrency || 0,
-      Date.now()
-    ].join('|');
-    
-    // Simple hash function
-    let hash = 0;
-    for (let i = 0; i < fingerprint.length; i++) {
-      const char = fingerprint.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
+    if (ipAddress && session.ipAddress !== ipAddress) {
+      console.warn('Session validation failed: IP address mismatch');
+      return false;
     }
-    
-    return Math.abs(hash).toString(36);
+
+    // Update last activity
+    session.lastActivity = now;
+    this.sessions.set(sessionId, session);
+
+    return true;
   }
 
-  private loadSession(): void {
-    if (!this.isClient) return;
-    
-    try {
-      const stored = localStorage.getItem(this.storageKey);
-      if (stored) {
-        this.sessionData = JSON.parse(stored);
-        
-        // Validate session data
-        if (this.sessionData && !this.isSessionValid()) {
-          this.sessionData = null;
-          localStorage.removeItem(this.storageKey);
+  // Get or create session with proper validation
+  async getOrCreateSession(existingSessionId?: string, userAgent?: string, ipAddress?: string): Promise<{
+    sessionId: string;
+    isNew: boolean;
+    user: unknown;
+  }> {
+    // SECURITY FIX: Validate existing session if provided
+    if (existingSessionId) {
+      const isValid = await this.validateSession(existingSessionId, userAgent, ipAddress);
+      if (isValid) {
+        const user = await this.database.getUserBySessionId(existingSessionId);
+        if (user) {
+          return {
+            sessionId: existingSessionId,
+            isNew: false,
+            user
+          };
         }
       }
-    } catch {
-      console.error('Failed to load session data');
-      this.sessionData = null;
-    }
-  }
-
-  private saveSession(): void {
-    if (!this.isClient || !this.sessionData) return;
-    
-    try {
-      localStorage.setItem(this.storageKey, JSON.stringify(this.sessionData));
-    } catch {
-      console.error('Failed to save session data');
-    }
-  }
-
-  private isSessionValid(): boolean {
-    if (!this.sessionData) return false;
-    
-    const now = Date.now();
-    const sessionAge = now - this.sessionData.sessionStartTime;
-    
-    // Check if session is expired (more than 24 hours old)
-    const SESSION_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
-    if (sessionAge > SESSION_EXPIRY) {
-      return false;
-    }
-    
-    return true;
-  }
-
-  public canStartSession(): boolean {
-    if (!this.sessionData) return true;
-    
-    // If user has paid, always allow
-    if (this.sessionData.isPaid) return true;
-    
-    // Check if user has already used their free session
-    if (this.sessionData.totalTimeUsed >= SESSION_DURATION) {
-      return false;
-    }
-    
-    return true;
-  }
-
-  public getRemainingFreeTime(): number {
-    if (!this.sessionData) return SESSION_DURATION;
-    if (this.sessionData.isPaid) return Infinity;
-    
-    const remaining = SESSION_DURATION - this.sessionData.totalTimeUsed;
-    return Math.max(0, remaining);
-  }
-
-  public startSession(): boolean {
-    console.log(`🚀 SessionManager[${this.instanceId}]: startSession called`);
-    
-    if (!this.canStartSession()) {
-      console.log(`❌ SessionManager[${this.instanceId}]: Cannot start session`);
-      return false;
     }
 
-    const now = Date.now();
-    
-    if (!this.sessionData) {
-      // Create new session
-      console.log(`🆕 SessionManager[${this.instanceId}]: Creating new session`);
-      this.sessionData = {
-        userId: this.generateDeviceId(),
-        sessionStartTime: now,
-        sessionEndTime: now + (SESSION_DURATION * 1000),
-        totalTimeUsed: 0,
-        isPaid: false,
-        lastAccessTime: now
+    // Create new session
+    const sessionId = this.generateSecureSessionId();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + this.SESSION_DURATION);
+
+    // SECURITY FIX: Store session data server-side
+    const sessionData: SessionData = {
+      sessionId,
+      createdAt: now,
+      lastActivity: now,
+      expiresAt,
+      userAgent: userAgent || 'unknown',
+      ipAddress: ipAddress || 'unknown'
+    };
+
+    this.sessions.set(sessionId, sessionData);
+
+    // Create user in database
+    const user = await this.database.createAnonymousUser(sessionId, this.TRIAL_DURATION / 60000);
+
+    return {
+      sessionId,
+      isNew: true,
+      user
+    };
+  }
+
+  // Check access with session validation
+  async checkAccess(sessionId: string, userAgent?: string, ipAddress?: string): Promise<{
+    hasAccess: boolean;
+    reason: string;
+    user?: unknown;
+    trialExpiresAt?: Date;
+    accessExpiresAt?: Date;
+  }> {
+    // SECURITY FIX: Validate session first
+    const isValidSession = await this.validateSession(sessionId, userAgent, ipAddress);
+    if (!isValidSession) {
+      return {
+        hasAccess: false,
+        reason: 'Invalid or expired session'
       };
-    } else {
-      // Resume existing session
-      console.log(`🔄 SessionManager[${this.instanceId}]: Resuming existing session`);
-      this.sessionData.lastAccessTime = now;
     }
 
-    console.log(`💾 SessionManager[${this.instanceId}]: Saving session data:`, this.sessionData);
-    this.saveSession();
-    this.startTimer();
-    
-    console.log(`✅ SessionManager[${this.instanceId}]: Session started successfully`);
-    return true;
+    // Check database access
+    const accessResult = await this.database.hasAccess(sessionId);
+    return accessResult;
   }
 
-  private startTimer(): void {
-    // Don't start timer for users with permanent access
-    if (this.sessionData?.isPaid) {
-      return;
+  // Get payment address for session
+  async getPaymentAddress(sessionId: string, userAgent?: string, ipAddress?: string): Promise<{
+    walletAddress: string;
+    referenceId: string;
+    amount: number;
+    expiresAt: Date;
+  } | null> {
+    // SECURITY FIX: Validate session
+    const isValidSession = await this.validateSession(sessionId, userAgent, ipAddress);
+    if (!isValidSession) {
+      return null;
     }
 
-    if (this.timerId) {
-      clearInterval(this.timerId);
-    }
-    
-    this.updateSessionTime();
-    
-    this.timerId = setInterval(() => {
-      this.updateSessionTime();
-    }, 1000);
+    const user = await this.database.getUserBySessionId(sessionId);
+    if (!user) return null;
+
+    return {
+      walletAddress: user.walletAddress,
+      referenceId: user.referenceId,
+      amount: 0.0009, // Fixed amount
+      expiresAt: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
+    };
   }
 
-  private updateSessionTime(): void {
-    if (!this.sessionData) {
-      return;
-    }
-
-    const now = Date.now();
-    
-    // Only update timer for unpaid users
-    if (!this.sessionData.isPaid) {
-      this.sessionData.totalTimeUsed += 1;
-      const timeLeft = Math.max(0, SESSION_DURATION - this.sessionData.totalTimeUsed);
-      
-      // Notify listeners
-      this.onTimeUpdateCallbacks.forEach(cb => {
-        try {
-          cb(timeLeft);
-        } catch {
-          // Ignore callback errors
-        }
-      });
-      
-      if (timeLeft <= 0) {
-        this.endSession();
-      }
-    } else {
-      // For paid users, notify listeners with infinite time
-      this.onTimeUpdateCallbacks.forEach(cb => {
-        try {
-          cb(Infinity);
-        } catch {
-          // Ignore callback errors
-        }
-      });
-    }
-    
-    this.sessionData.lastAccessTime = now;
-    this.saveSession();
-  }
-
-  public endSession(): void {
-    if (this.timerId) {
-      clearInterval(this.timerId);
-      this.timerId = null;
+  // Mark payment received
+  async markPaymentReceived(sessionId: string, txId: string, amount: number, userAgent?: string, ipAddress?: string): Promise<boolean> {
+    // SECURITY FIX: Validate session
+    const isValidSession = await this.validateSession(sessionId, userAgent, ipAddress);
+    if (!isValidSession) {
+      return false;
     }
 
-    // Notify all listeners
-    this.onSessionEndCallbacks.forEach(cb => cb());
-    
-    this.saveSession();
+    const user = await this.database.markUserAsPaid(sessionId, txId, amount, this.PAID_DURATION / 3600000);
+    return user !== null;
   }
 
-  public markAsPaid(walletAddress: string, transactionId: string): void {
-    if (!this.sessionData) {
-      this.sessionData = {
-        userId: this.generateDeviceId(),
-        sessionStartTime: Date.now(),
-        sessionEndTime: 0,
-        totalTimeUsed: 0,
-        isPaid: true,
-        walletAddress,
-        paymentTransactionId: transactionId,
-        lastAccessTime: Date.now()
-      };
-    } else {
-      this.sessionData.isPaid = true;
-      this.sessionData.walletAddress = walletAddress;
-      this.sessionData.paymentTransactionId = transactionId;
+  // Get session recovery info
+  async getSessionRecoveryInfo(sessionId: string): Promise<{
+    sessionId: string;
+    walletAddress: string;
+    referenceId: string;
+    status: 'trial' | 'paid' | 'expired';
+    expiresAt: Date | null;
+  } | null> {
+    const user = await this.database.getUserBySessionId(sessionId);
+    if (!user) return null;
+    const now = new Date();
+    let status: 'trial' | 'paid' | 'expired' = 'expired';
+    if (user.isPaid && user.accessExpiresAt && now < user.accessExpiresAt) {
+      status = 'paid';
+    } else if (now < user.trialExpiresAt) {
+      status = 'trial';
     }
-    
-    this.saveSession();
+    return {
+      sessionId: user.sessionId,
+      walletAddress: user.walletAddress,
+      referenceId: user.referenceId,
+      status,
+      expiresAt: status === 'paid' ? user.accessExpiresAt : user.trialExpiresAt
+    };
   }
 
-  public onSessionEnd(callback: () => void): void {
-    this.onSessionEndCallbacks.push(callback);
-  }
+  // SECURITY FIX: Clean up expired sessions
+  private async cleanupExpiredSessions(): Promise<void> {
+    const now = new Date();
+    let deletedCount = 0;
 
-  public onTimeUpdate(callback: (timeLeft: number) => void): void {
-    this.onTimeUpdateCallbacks.push(callback);
+    for (const [sessionId, session] of this.sessions.entries()) {
+      if (now > session.expiresAt) {
+        this.sessions.delete(sessionId);
+        deletedCount++;
   }
-
-  public getSessionData(): SessionData | null {
-    return this.sessionData;
-  }
-
-  public destroy(): void {
-    if (this.timerId) {
-      clearInterval(this.timerId);
-      this.timerId = null;
     }
-    this.onSessionEndCallbacks = [];
-    this.onTimeUpdateCallbacks = [];
+
+    if (deletedCount > 0) {
+      console.log(`🧹 Cleaned up ${deletedCount} expired sessions`);
+    }
+  }
+
+  // SECURITY FIX: Invalidate session (for logout)
+  async invalidateSession(sessionId: string): Promise<void> {
+    this.sessions.delete(sessionId);
+  }
+
+  // Get session info (for debugging)
+  async getSessionInfo(sessionId?: string): Promise<SessionData | null> {
+    if (!sessionId) {
+      // Return first available session or null
+      const firstSession = this.sessions.values().next().value;
+      return firstSession || null;
+    }
+    return this.sessions.get(sessionId) || null;
+  }
+
+  // Stub methods for compatibility with existing components
+  canStartSession(): boolean {
+    return true; // Always allow session start for now
+  }
+
+  startSession(): boolean {
+    return true; // Always succeed for now
+  }
+
+  getRemainingFreeTime(): number {
+    return 300000; // Return 5 minutes in milliseconds
+  }
+
+  // Get all users (for admin purposes)
+  async getAllUsers(): Promise<unknown[]> {
+    return await this.database.getAllUsers();
+  }
+
+  // Get admin statistics
+  async getAdminStats(): Promise<{
+    totalUsers: number;
+    trialUsers: number;
+    paidUsers: number;
+    totalRevenue: number;
+    recentPayments: unknown[];
+  }> {
+    return await this.database.getPaymentStats();
+  }
+
+  // Get user by wallet address (for webhook processing)
+  async getUserByWalletAddress(walletAddress: string): Promise<unknown | null> {
+    return await this.database.getUserByWalletAddress(walletAddress);
+  }
+
+  // Event listeners for session management
+  private sessionEndListeners: (() => void)[] = [];
+  private timeUpdateListeners: ((timeLeft: number) => void)[] = [];
+
+  onSessionEnd(callback: () => void): void {
+    this.sessionEndListeners.push(callback);
+  }
+
+  onTimeUpdate(callback: (timeLeft: number) => void): void {
+    this.timeUpdateListeners.push(callback);
+  }
+
+  private notifySessionEnd(): void {
+    this.sessionEndListeners.forEach(callback => callback());
+  }
+
+  private notifyTimeUpdate(timeLeft: number): void {
+    this.timeUpdateListeners.forEach(callback => callback(timeLeft));
   }
 }
 
-// Singleton instance
-let sessionManagerInstance: SessionManager | null = null;
-
+// SECURITY FIX: Export the getSessionManager function for compatibility
 export function getSessionManager(): SessionManager {
-  if (!sessionManagerInstance) {
-    sessionManagerInstance = new SessionManager();
-  }
-  return sessionManagerInstance;
+  return SessionManager.getInstance();
 } 

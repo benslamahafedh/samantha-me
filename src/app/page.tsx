@@ -3,8 +3,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import SecureVoiceManager from '@/components/SecureVoiceManager';
 import VoiceVisualization from '@/components/VoiceVisualization';
-import PaymentModal from '@/components/PaymentModal';
+import CryptoPaymentModal from '@/components/CryptoPaymentModal';
 import WalletProvider from '@/components/WalletProvider';
+import VoiceErrorDisplay from '@/components/VoiceErrorDisplay';
+import SessionTimer from '@/components/SessionTimer';
 
 export default function Home() {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -17,6 +19,53 @@ export default function Home() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [hasWalletAccess, setHasWalletAccess] = useState(false);
   const [isTrialActive, setIsTrialActive] = useState(false);
+  const [sessionId, setSessionId] = useState<string>('');
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+
+  // Initialize session
+  useEffect(() => {
+    const initializeSession = async () => {
+      try {
+        // Try to get existing session from localStorage
+        const existingSessionId = localStorage.getItem('samantha_session_id');
+        
+        const response = await fetch('/api/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: existingSessionId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setSessionId(data.sessionId);
+          localStorage.setItem('samantha_session_id', data.sessionId);
+          
+          // If user has access, update the state
+          if (data.hasAccess) {
+            setHasWalletAccess(true);
+            setIsTrialActive(data.reason === 'Trial access active');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize session:', error);
+      }
+    };
+    
+    initializeSession();
+
+    // Listen for session initialization from payment modal
+    const handleSessionInitialized = (event: CustomEvent) => {
+      setSessionId(event.detail.sessionId);
+      localStorage.setItem('samantha_session_id', event.detail.sessionId);
+    };
+
+    window.addEventListener('sessionInitialized', handleSessionInitialized as EventListener);
+
+    return () => {
+      window.removeEventListener('sessionInitialized', handleSessionInitialized as EventListener);
+    };
+  }, []);
 
   // Mobile-specific fixes to prevent interference with voice interaction
   useEffect(() => {
@@ -75,10 +124,10 @@ export default function Home() {
       // Request microphone permission early
       navigator.mediaDevices.getUserMedia({ audio: true })
         .then(() => {
-          console.log('Microphone access granted on iOS');
+          // Permission granted
         })
         .catch((err) => {
-          console.log('Microphone access not granted:', err);
+          // Permission denied
         });
     }
 
@@ -91,7 +140,6 @@ export default function Home() {
     };
   }, []);
 
-
   const handleHasStartedChange = (started: boolean) => {
     setHasStarted(started);
   };
@@ -101,7 +149,10 @@ export default function Home() {
   };
 
   const handleSessionTimeChange = (timeLeft: number) => {
-    setSessionTimeLeft(timeLeft);
+    // Only update timer for trial users, not paid users
+    if (!hasWalletAccess) {
+      setSessionTimeLeft(timeLeft);
+    }
   };
 
   const handleSessionEndedChange = (sessionEnded: boolean) => {
@@ -109,16 +160,66 @@ export default function Home() {
   };
 
   const handleRequirePayment = () => {
-    setShowPaymentModal(true);
+    if (sessionId && sessionId.trim() !== '') {
+      setShowPaymentModal(true);
+    } else {
+      console.error('Cannot show payment modal: Session ID is not available');
+      // Try to reinitialize session
+      const initializeSession = async () => {
+        try {
+          const response = await fetch('/api/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId: null })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            setSessionId(data.sessionId);
+            localStorage.setItem('samantha_session_id', data.sessionId);
+          }
+        } catch (error) {
+          console.error('Failed to initialize session for payment:', error);
+        }
+      };
+      
+      initializeSession();
+    }
   };
 
-  const handlePaymentSuccess = () => {
+  const handlePaymentSuccess = async () => {
     setShowPaymentModal(false);
     setSessionEnded(false);
-    // The SecureVoiceManager will automatically detect the payment and update access
+    
+    // Refresh session access status
+    try {
+      const response = await fetch('/api/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // Update access status immediately
+        setHasWalletAccess(data.hasAccess);
+        setIsTrialActive(data.reason === 'Trial access active');
+        
+        // Trigger access status change
+        handleAccessStatusChange(data.hasAccess, data.reason === 'Trial access active');
+        
+        // Dispatch payment success event for SecureVoiceManager
+        const paymentSuccessEvent = new Event('paymentSuccess');
+        window.dispatchEvent(paymentSuccessEvent);
+        
+        console.log('🎉 Payment success handled - access status updated');
+      }
+    } catch (error) {
+      console.error('Failed to refresh session after payment:', error);
+    }
   };
-
-
 
   const handleIntroComplete = useCallback(() => {
     setIsIntroComplete(true);
@@ -138,7 +239,14 @@ export default function Home() {
     <WalletProvider>
       <main className="relative min-h-screen overflow-hidden select-none touch-none">
         <div className="relative min-h-screen select-none touch-none">
-          <VoiceVisualization
+          {/* Session Timer */}
+          <SessionTimer 
+            timeLeft={hasWalletAccess ? 3600 : sessionTimeLeft} // Show 1 hour for paid users
+            isTrialActive={isTrialActive}
+            hasWalletAccess={hasWalletAccess}
+          />
+
+          <VoiceVisualization 
             isListening={isListening}
             isSpeaking={isSpeaking}
             transcript={''}
@@ -151,7 +259,16 @@ export default function Home() {
             sessionTimeLeft={sessionTimeLeft}
             sessionEnded={sessionEnded}
           />
-          
+
+          {/* Simple clickable overlay when ready */}
+          {isReady && !hasStarted && isIntroComplete && !sessionEnded && (
+            <div 
+              className="fixed inset-0 z-40 cursor-pointer"
+              onClick={handleStartConversation}
+              style={{ pointerEvents: 'auto' }}
+            />
+          )}
+
           <SecureVoiceManager
             onSpeakingChange={setIsSpeaking}
             onListeningChange={setIsListening}
@@ -161,45 +278,41 @@ export default function Home() {
             onSessionEndedChange={handleSessionEndedChange}
             onRequirePayment={handleRequirePayment}
             onAccessStatusChange={handleAccessStatusChange}
+            sessionId={sessionId}
+            onVoiceError={setVoiceError}
           />
         </div>
 
-        {/* Payment Modal */}
-        <PaymentModal
+        {/* Crypto Payment Modal */}
+        <CryptoPaymentModal
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
           onPaymentSuccess={handlePaymentSuccess}
+          sessionId={sessionId}
         />
 
-        {/* Session timer display - only for trial users */}
-        {hasStarted && !sessionEnded && isTrialActive && sessionTimeLeft < 999999 && sessionTimeLeft > 0 && (
-          <div className="fixed top-4 right-4 z-20">
-            <div className="bg-black/30 backdrop-blur-sm rounded-full px-4 py-2 border border-white/10">
-              <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${sessionTimeLeft <= 30 ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
-                <span className="text-white/80 text-sm font-light">
-                  {Math.floor(sessionTimeLeft / 60)}:{(sessionTimeLeft % 60).toString().padStart(2, '0')}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Unlimited access indicator for paid users */}
-        {hasStarted && !sessionEnded && hasWalletAccess && (
-          <div className="fixed top-4 right-4 z-20">
-            <div className="bg-gradient-to-r from-rose-500/20 to-pink-500/20 backdrop-blur-sm rounded-full px-4 py-2 border border-rose-500/30">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 rounded-full bg-rose-400 animate-pulse"></div>
-                <span className="text-rose-200 text-sm font-light">
-                  Unlimited
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-
+        {/* Voice Error Display */}
+        <VoiceErrorDisplay
+          error={voiceError}
+          onRetry={() => {
+            setVoiceError(null);
+            // Trigger a conversation restart
+            window.dispatchEvent(new Event('startConversation'));
+          }}
+          onDismiss={() => setVoiceError(null)}
+          onRequestPermission={async () => {
+            setVoiceError(null);
+            // Try to request microphone permission directly
+            try {
+              await navigator.mediaDevices.getUserMedia({ audio: true });
+              // If successful, trigger conversation restart
+              window.dispatchEvent(new Event('startConversation'));
+            } catch (error) {
+              console.error('Failed to request microphone permission:', error);
+              setVoiceError('Microphone access denied. Please check your browser settings.');
+            }
+          }}
+        />
       </main>
     </WalletProvider>
   );

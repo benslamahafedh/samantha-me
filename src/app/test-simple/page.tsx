@@ -19,24 +19,20 @@ export default function TestSimple() {
   useEffect(() => {
     const sessionManager = getSessionManager();
     
-    // Set up timer listener
-    sessionManager.onTimeUpdate((time) => {
-      console.log('⏰ Timer update:', time);
-      setTimeLeft(time);
-    });
-    
     // Update session info every second
     const interval = setInterval(() => {
+      const remaining = sessionManager.getRemainingFreeTime();
+      setTimeLeft(remaining);
+      
       setSessionInfo({
         canStart: sessionManager.canStartSession(),
-        remaining: sessionManager.getRemainingFreeTime(),
-        data: sessionManager.getSessionData()
+        remaining,
+        data: sessionManager.getSessionInfo()
       });
     }, 1000);
     
     return () => {
       clearInterval(interval);
-      sessionManager.destroy();
     };
   }, []);
 

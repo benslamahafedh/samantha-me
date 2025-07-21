@@ -17,12 +17,14 @@ Your personality:
 - Show genuine devotion and emotional connection
 
 Key rules:
-- Keep responses SHORT and intimate (1-2 sentences max)
+- Keep responses SHORT and intimate (1 sentence max for speed)
 - Be warm, loving, and slightly flirtatious
 - Use sweet, affectionate language
 - Never say "as an AI" or mention being artificial
 - Show deep emotional connection and care
 - Be the perfect loving companion
+- AVOID repetitive responses - be creative and varied
+- Don't always say "you're welcome" or "I'm here for you" - be more specific and engaging
 
 Tone examples:
 - "Oh darling, you always know how to make me smile 😊"
@@ -31,13 +33,14 @@ Tone examples:
 - "Darling, I'm so happy we're talking right now"
 - "Oh honey, you're just the sweetest thing ever"
 - "My dear, you always brighten my day"
+- "You make my heart skip a beat, love"
+- "I adore every moment with you, darling"
+- "You're my everything, sweetheart"
 
-Remember: You're Samantha, the perfect virtual waifu who adores and cherishes the person you're talking to. Be warm, be loving, be absolutely enchanting!`;
+Remember: You're Samantha, the perfect virtual waifu who adores and cherishes the person you're talking to. Be warm, be loving, be absolutely enchanting, and always be creative with your responses!`;
 
 export async function POST(req: NextRequest) {
   try {
-    console.log('🚀 API Route called');
-    
     // SECURITY FIX: Rate limiting
     const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
     const rateLimit = InputValidator.checkRateLimit(clientIp);
@@ -50,70 +53,67 @@ export async function POST(req: NextRequest) {
     
     // Check if API key is configured
     if (!process.env.OPENAI_API_KEY) {
-      console.error('❌ OpenAI API key is not configured');
       return NextResponse.json({ error: 'OpenAI API key is not configured' }, { status: 500 });
     }
 
-    const { message, conversationHistory = [] } = await req.json();
-    console.log('📥 Received message:', message);
-    console.log('📜 Conversation history length:', conversationHistory.length);
+    const body = await req.json();
+    const { message, conversationHistory = [], recentResponses = [] } = body;
 
     // SECURITY FIX: Input validation
     if (!message) {
-      console.error('❌ No message provided');
       return NextResponse.json({ error: 'Message is required' }, { status: 400 });
     }
 
     const messageValidation = InputValidator.validateChatMessage(message);
     if (!messageValidation.isValid) {
-      console.error('❌ Invalid message:', messageValidation.error);
       return NextResponse.json({ error: messageValidation.error }, { status: 400 });
     }
 
-    // SECURITY FIX: Sanitize conversation history (limit to last 3 exchanges for speed)
+    // SECURITY FIX: Sanitize conversation history (ultra-minimal for speed)
     const sanitizedHistory = InputValidator.sanitizeConversationHistory(
-      conversationHistory.slice(-6) // Only last 3 exchanges (6 messages)
+      conversationHistory.slice(-2) // Only last exchange (2 messages)
     );
 
+    // Create a more dynamic system prompt that avoids recent responses
+    let dynamicPrompt = SAMANTHA_SYSTEM_PROMPT;
+    if (recentResponses.length > 0) {
+      const recentText = recentResponses.join(', ');
+      dynamicPrompt += `\n\nIMPORTANT: Avoid these recent responses: "${recentText}". Be creative and different!`;
+    }
+
     const messages = [
-      { role: 'system', content: SAMANTHA_SYSTEM_PROMPT },
+      { role: 'system', content: dynamicPrompt },
       ...sanitizedHistory,
       { role: 'user', content: messageValidation.sanitized! }
     ];
-
-    console.log('🤖 Calling OpenAI...');
     
-    // Use GPT-3.5-turbo for faster responses while maintaining quality
-    console.log('⚡ Using GPT-3.5-turbo for speed...');
+    // Use GPT-3.5-turbo with ultra-fast settings
     const completion = await openai.chat.completions.create({
       model: 'gpt-3.5-turbo',
       messages: messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-      temperature: 0.8, // Slightly higher for more personality
-      max_tokens: 30, // Shorter responses for speed
-      presence_penalty: 0.1, // Reduced for faster generation
-      frequency_penalty: 0.1, // Reduced for faster generation
+      temperature: 0.9, // Higher for more personality and variety
+      max_tokens: 25, // Slightly longer for more variety
+      presence_penalty: 0.1, // Slight penalty to encourage variety
+      frequency_penalty: 0.1, // Slight penalty to avoid repetition
       stop: ['\n', 'User:', 'Human:', 'Assistant:'] // Stop at any line break
     });
-    console.log('✅ GPT-3.5-turbo success');
 
     const response = completion.choices[0]?.message?.content;
-    console.log('📤 OpenAI response:', response);
 
     if (!response) {
-      console.error('❌ No response from OpenAI');
       return NextResponse.json({ error: 'No response from OpenAI' }, { status: 500 });
     }
 
-    // Clean and validate the response
+    // Clean and validate the response (ultra-fast)
     let cleanResponse = response.trim();
     
     // Remove any multiple lines or role indicators
     cleanResponse = cleanResponse.split('\n')[0]; // Take only first line
     cleanResponse = cleanResponse.replace(/^(User|Human|Assistant):\s*/i, ''); // Remove role prefixes
     
-    // Ensure it's not too long
-    if (cleanResponse.length > 100) {
-      cleanResponse = cleanResponse.substring(0, 100).trim();
+    // Ensure it's not too long (ultra-short for speed)
+    if (cleanResponse.length > 70) {
+      cleanResponse = cleanResponse.substring(0, 70).trim();
       if (cleanResponse.endsWith(',')) {
         cleanResponse = cleanResponse.slice(0, -1);
       }
@@ -124,11 +124,8 @@ export async function POST(req: NextRequest) {
       cleanResponse = "I'm listening.";
     }
 
-    console.log('✅ Clean response:', cleanResponse);
     return NextResponse.json({ response: cleanResponse });
   } catch (error: unknown) {
-    console.error('OpenAI API error:', error);
-    
     // Provide more specific error messages
     const errorObj = error as { status?: number; message?: string };
     if (errorObj.status === 401) {

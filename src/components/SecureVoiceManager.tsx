@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { useOpenAIRealtime } from '@/hooks/useOpenAIRealtime';
-import { useOpenAITTS } from '@/hooks/useOpenAITTS';
-import { getWalletAccessManager } from '@/lib/walletAccessManager';
+import { useFastVoiceProcessing } from '@/hooks/useFastVoiceProcessing';
+import { useMicrophonePermission } from '@/hooks/useMicrophonePermission';
 
 interface SecureVoiceManagerProps {
   onSpeakingChange?: (isSpeaking: boolean) => void;
@@ -16,6 +14,8 @@ interface SecureVoiceManagerProps {
   onRequirePayment?: () => void;
   onManualStartListening?: (startFn: () => void) => void;
   onAccessStatusChange?: (hasAccess: boolean, isTrialActive: boolean) => void;
+  sessionId?: string;
+  onVoiceError?: (error: string | null) => void;
 }
 
 export default function SecureVoiceManager({
@@ -27,7 +27,9 @@ export default function SecureVoiceManager({
   onSessionEndedChange,
   onRequirePayment,
   onManualStartListening,
-  onAccessStatusChange
+  onAccessStatusChange,
+  sessionId: propSessionId,
+  onVoiceError
 }: SecureVoiceManagerProps) {
   const [hasStarted, setHasStarted] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -36,49 +38,179 @@ export default function SecureVoiceManager({
   const [hasWalletAccess, setHasWalletAccess] = useState(false);
   const [isTrialActive, setIsTrialActive] = useState(false);
   const [trialTimeLeft, setTrialTimeLeft] = useState(180); // 3 minutes
+  const [sessionId, setSessionId] = useState<string>('');
   
-  const { publicKey, connected } = useWallet();
-  const walletAccessManager = useRef(getWalletAccessManager());
   const trialTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasShownPaymentRef = useRef(false);
 
-  const realtimeVoice = useOpenAIRealtime();
-  const textToSpeech = useOpenAITTS();
+  const fastVoice = useFastVoiceProcessing();
+  const microphonePermission = useMicrophonePermission();
 
-  // Refs for access status
+  // Create refs for fastVoice functions to avoid dependency issues
+  const fastVoiceRef = useRef(fastVoice);
+  useEffect(() => {
+    fastVoiceRef.current = fastVoice;
+  });
+
+  // Monitor voice errors
+  useEffect(() => {
+    if (fastVoice.error) {
+      onVoiceErrorRef.current?.(fastVoice.error);
+    }
+  }, [fastVoice.error]);
+
+  // Monitor microphone permission errors
+  useEffect(() => {
+    if (microphonePermission.error) {
+      onVoiceErrorRef.current?.(microphonePermission.error);
+    }
+  }, [microphonePermission.error]);
+
+  // Monitor microphone permission changes
+  useEffect(() => {
+    // Permission state monitoring (no logging)
+  }, [microphonePermission.hasPermission, microphonePermission.isChecking, microphonePermission.error]);
+
+  // Refs for access status and error handling
   const onAccessStatusChangeRef = useRef(onAccessStatusChange);
+  const onVoiceErrorRef = useRef(onVoiceError);
+  const microphonePermissionRef = useRef(microphonePermission);
 
   useEffect(() => {
     onAccessStatusChangeRef.current = onAccessStatusChange;
   });
 
-  // Check wallet access when wallet connects
   useEffect(() => {
-    const checkAccess = async () => {
-      if (connected && publicKey) {
-        const hasAccess = await walletAccessManager.current.checkWalletAccess(publicKey.toBase58());
-        setHasWalletAccess(hasAccess);
-        onAccessStatusChangeRef.current?.(hasAccess, isTrialActive);
-      } else {
-        setHasWalletAccess(false);
-        onAccessStatusChangeRef.current?.(false, isTrialActive);
+    onVoiceErrorRef.current = onVoiceError;
+  });
+
+  useEffect(() => {
+    microphonePermissionRef.current = microphonePermission;
+  });
+
+  // Initialize session and check access
+  useEffect(() => {
+    const initializeSession = async () => {
+      try {
+        // Use prop sessionId if available, otherwise get from localStorage
+        const existingSessionId = propSessionId || localStorage.getItem('samantha_session_id');
+        
+        const response = await fetch('/api/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: existingSessionId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setSessionId(data.sessionId);
+          localStorage.setItem('samantha_session_id', data.sessionId);
+          
+          // Update access status
+          setHasWalletAccess(data.hasAccess);
+          setIsTrialActive(data.reason === 'Trial access active');
+          onAccessStatusChangeRef.current?.(data.hasAccess, data.reason === 'Trial access active');
+          
+          // Start trial timer if trial is active
+          if (data.reason === 'Trial access active' && data.trialExpiresAt) {
+            const timeLeft = Math.max(0, Math.floor((new Date(data.trialExpiresAt).getTime() - Date.now()) / 1000));
+            setTrialTimeLeft(timeLeft);
+            startTrialTimer();
+          }
+        }
+      } catch (error) {
+        console.error('Failed to initialize session:', error);
+      }
+    };
+    
+    initializeSession();
+  }, [propSessionId]);
+
+  // Update sessionId when prop changes
+  useEffect(() => {
+    if (propSessionId && propSessionId !== sessionId) {
+      setSessionId(propSessionId);
+    }
+  }, [propSessionId, sessionId]);
+
+  // Listen for payment success events and access status changes
+  useEffect(() => {
+    const refreshSession = async () => {
+      if (!sessionId) return;
+      
+      try {
+        const response = await fetch('/api/session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // Update access status
+          setHasWalletAccess(data.hasAccess);
+          setIsTrialActive(data.reason === 'Trial access active');
+          onAccessStatusChangeRef.current?.(data.hasAccess, data.reason === 'Trial access active');
+          
+          console.log('🔐 Access status updated after payment:', { 
+            hasAccess: data.hasAccess, 
+            reason: data.reason, 
+            isTrialActive: data.reason === 'Trial access active' 
+          });
+          
+          // Reset payment modal flag
+          hasShownPaymentRef.current = false;
+          
+          // Reset session ended state
+          setSessionEnded(false);
+          
+          // If user now has access, they should be able to start conversation
+          if (data.hasAccess) {
+            console.log('🎉 Payment successful - user now has access');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to refresh session:', error);
       }
     };
 
-    checkAccess();
-  }, [connected, publicKey, isTrialActive]);
+    // Listen for payment success events
+    const handlePaymentSuccess = async () => {
+      console.log('💰 Payment success event received');
+      await refreshSession();
+    };
+
+    window.addEventListener('paymentSuccess', handlePaymentSuccess);
+    
+    return () => {
+      window.removeEventListener('paymentSuccess', handlePaymentSuccess);
+    };
+  }, [sessionId]);
 
   // Track if component has mounted on client side
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
-  // Set ready state when realtime is supported and connected
+  // Set ready state when fast voice is supported and connected
   useEffect(() => {
-    if (isMounted && realtimeVoice.isSupported) {
+    if (isMounted && fastVoice.isSupported) {
       setIsReady(true);
     }
-  }, [isMounted, realtimeVoice.isSupported]);
+  }, [isMounted, fastVoice.isSupported]);
+
+  // Also set ready state after a short delay to ensure everything is initialized
+  useEffect(() => {
+    if (isMounted) {
+      const timer = setTimeout(() => {
+        setIsReady(true);
+      }, 500); // Reduced to 500ms for faster response
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isMounted]);
 
   // Notify parent of state changes - use refs to avoid dependency loops
   const onHasStartedChangeRef = useRef(onHasStartedChange);
@@ -111,8 +243,8 @@ export default function SecureVoiceManager({
   }, [isReady]);
 
   useEffect(() => {
-    onSpeakingChangeRef.current?.(realtimeVoice.isSpeaking || textToSpeech.isSpeaking);
-  }, [realtimeVoice.isSpeaking, textToSpeech.isSpeaking]);
+    onSpeakingChangeRef.current?.(fastVoice.isSpeaking);
+  }, [fastVoice.isSpeaking]);
 
   // Silence detection and restart control
   const lastUserInteractionRef = useRef<number>(Date.now());
@@ -146,9 +278,9 @@ export default function SecureVoiceManager({
 
   // Track successful voice input to reset silence detection
   useEffect(() => {
-    if (realtimeVoice.transcript) {
-      if (isMeaningfulTranscript(realtimeVoice.transcript)) {
-        console.log('🎯 Meaningful speech detected:', realtimeVoice.transcript);
+    if (fastVoice.transcript) {
+      if (isMeaningfulTranscript(fastVoice.transcript)) {
+
         lastUserInteractionRef.current = Date.now();
         restartAttemptsRef.current = 0;
         silentAttemptsRef.current = 0;
@@ -162,30 +294,30 @@ export default function SecureVoiceManager({
         }
         isInCooldownRef.current = false;
       } else {
-        console.log('🔇 Filler or silent speech detected, incrementing silentAttempts');
+
         silentAttemptsRef.current += 1;
         if (silentAttemptsRef.current >= MAX_SILENT_ATTEMPTS && !isInCooldownRef.current) {
           isInCooldownRef.current = true;
-          console.log('⏸️ Too many silent attempts, entering cooldown for 30s');
+          
           cooldownTimeoutRef.current = setTimeout(() => {
             isInCooldownRef.current = false;
             silentAttemptsRef.current = 0;
-            console.log('▶️ Cooldown ended, can restart listening');
+            
           }, COOLDOWN_TIME);
         }
       }
     }
-  }, [realtimeVoice.transcript]);
+  }, [fastVoice.transcript]);
 
   // Handle continuous listening - restart when not listening and not speaking
   useEffect(() => {
-    if (hasStarted && !sessionEnded && realtimeVoice.isConnected && !realtimeVoice.isListening && !textToSpeech.isSpeaking) {
+    if (hasStarted && !sessionEnded && fastVoice.isConnected && !fastVoice.isListening && !fastVoice.isSpeaking) {
       // Only restart if we have access (paid) or trial is still active
       if (hasWalletAccess || (isTrialActive && trialTimeLeft > 0)) {
         // Check if conversation has been running too long
         const conversationDuration = Date.now() - conversationStartTimeRef.current;
         if (conversationDuration > MAX_CONVERSATION_TIME) {
-          console.log('⏰ Maximum conversation time reached, stopping');
+  
           setSessionEnded(true);
           onSessionEndedChangeRef.current?.(true);
           return;
@@ -195,14 +327,14 @@ export default function SecureVoiceManager({
         const restartDelay = 500; // Much shorter delay for more responsive conversation
         setTimeout(() => {
           // Double-check conditions before restarting
-          if (hasStarted && !sessionEnded && !textToSpeech.isSpeaking && !realtimeVoice.isListening) {
-            console.log('🔄 Restarting listening for continuous conversation');
-            realtimeVoice.startListening();
+          if (hasStarted && !sessionEnded && !fastVoice.isSpeaking && !fastVoice.isListening) {
+    
+            fastVoice.startListening();
           }
         }, restartDelay);
       }
     }
-  }, [hasStarted, sessionEnded, realtimeVoice.isConnected, realtimeVoice.isListening, textToSpeech.isSpeaking, hasWalletAccess, isTrialActive, trialTimeLeft, realtimeVoice.startListening, MAX_CONVERSATION_TIME]);
+  }, [hasStarted, sessionEnded, fastVoice.isConnected, fastVoice.isListening, fastVoice.isSpeaking, hasWalletAccess, isTrialActive, trialTimeLeft, fastVoice.startListening, MAX_CONVERSATION_TIME]);
 
   // Refs for manual start
   const onManualStartListeningRef = useRef(onManualStartListening);
@@ -214,16 +346,16 @@ export default function SecureVoiceManager({
   // Provide manual start function to parent
   useEffect(() => {
     const manualStart = async () => {
-      if (!realtimeVoice.isListening && realtimeVoice.isConnected) {
+      if (!fastVoice.isListening && fastVoice.isConnected) {
         // Only allow if user has access or trial time left
         if (hasWalletAccess || (isTrialActive && trialTimeLeft > 0)) {
-          await realtimeVoice.startListening();
+          await fastVoice.startListening();
         }
       }
     };
     
     onManualStartListeningRef.current?.(manualStart);
-  }, [realtimeVoice.isListening, realtimeVoice.isConnected, hasWalletAccess, isTrialActive, trialTimeLeft, realtimeVoice.startListening]);
+  }, [fastVoice.isListening, fastVoice.isConnected, hasWalletAccess, isTrialActive, trialTimeLeft, fastVoice.startListening]);
 
   // Track user interactions (clicks/touches) to prevent timeout
   useEffect(() => {
@@ -269,19 +401,21 @@ export default function SecureVoiceManager({
         setSessionEnded(true);
         setIsTrialActive(false);
         onSessionEndedChangeRef.current?.(true);
-        realtimeVoice.stopListening();
-        textToSpeech.stop();
+        fastVoice.stopListening();
         
         if (!hasShownPaymentRef.current) {
           hasShownPaymentRef.current = true;
           onRequirePaymentRef.current?.();
         }
       }
-    } else if (hasWalletAccess) {
-      // For paid users, show infinite time (not Infinity to avoid NaN issues)
+    } else if (hasWalletAccess && !isTrialActive) {
+      // For paid users (not in trial), show infinite time
       onSessionTimeChangeRef.current?.(999999);
+    } else if (!isTrialActive && !hasWalletAccess) {
+      // No trial, no access - show 0 time
+      onSessionTimeChangeRef.current?.(0);
     }
-  }, [isTrialActive, hasWalletAccess, trialTimeLeft, realtimeVoice, textToSpeech]);
+  }, [isTrialActive, hasWalletAccess, trialTimeLeft, fastVoice]);
 
   // Start trial timer
   const startTrialTimer = () => {
@@ -312,38 +446,123 @@ export default function SecureVoiceManager({
         return;
       }
 
-      // Check if user has wallet access (paid)
-      if (hasWalletAccess) {
-        // Paid user - unlimited access
-        setHasStarted(true);
-        conversationStartTimeRef.current = Date.now();
-        realtimeVoice.resetTranscript(); // Reset transcript and cooldowns
-        await realtimeVoice.startListening();
-        
-        setTimeout(() => {
-          textToSpeech.speak("Hello, I'm Samantha. How can I help you today?");
-        }, 500);
-        
-        return;
-      }
+      console.log('🎤 Starting conversation - checking access status...');
 
-      // Check if user can start free trial
-      if (walletAccessManager.current.canStartFreeTrial()) {
-        // Start free trial
-        setIsTrialActive(true);
-        setHasStarted(true);
-        conversationStartTimeRef.current = Date.now();
-        realtimeVoice.resetTranscript(); // Reset transcript and cooldowns
-        walletAccessManager.current.markTrialUsed();
-        startTrialTimer();
-        
-        await realtimeVoice.startListening();
-        
-        setTimeout(() => {
-          //textToSpeech.speak("Hello, I'm Samantha. You have 3 minutes to try me out!");
-        }, 500);
+      // First, refresh session access status before making decisions
+      if (sessionId) {
+        try {
+          const response = await fetch('/api/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            // Update access status
+            setHasWalletAccess(data.hasAccess);
+            setIsTrialActive(data.reason === 'Trial access active');
+            onAccessStatusChangeRef.current?.(data.hasAccess, data.reason === 'Trial access active');
+            
+            console.log('🔐 Access status updated:', { 
+              hasAccess: data.hasAccess, 
+              reason: data.reason, 
+              isTrialActive: data.reason === 'Trial access active' 
+            });
+            
+            // Start trial timer if trial is active
+            if (data.reason === 'Trial access active' && data.trialExpiresAt) {
+              const timeLeft = Math.max(0, Math.floor((new Date(data.trialExpiresAt).getTime() - Date.now()) / 1000));
+              setTrialTimeLeft(timeLeft);
+              startTrialTimer();
+            }
+            
+            // Check if user has wallet access (paid) - use fresh data
+            if (data.hasAccess) {
+              console.log('💰 Paid user detected - starting unlimited conversation');
+              // Paid user - unlimited access
+              setHasStarted(true);
+              conversationStartTimeRef.current = Date.now();
+              // Check microphone permission first
+              const currentPermission = microphonePermissionRef.current;
+              
+              if (!currentPermission.hasPermission && !currentPermission.isChecking) {
+                const permissionGranted = await currentPermission.requestPermission();
+                if (!permissionGranted) {
+                  onVoiceErrorRef.current?.('Microphone permission required. Please allow microphone access and try again.');
+                  return;
+                }
+              }
+              
+              try {
+                await fastVoiceRef.current.startListening();
+                
+                setTimeout(() => {
+                  fastVoiceRef.current.sendMessage("Hello, I'm Samantha. How can I help you today?");
+                }, 500);
+              } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Voice recognition failed';
+                onVoiceErrorRef.current?.(errorMessage);
+                // Fallback: still start conversation but show error
+                setTimeout(() => {
+                  fastVoiceRef.current.sendMessage("Hello, I'm Samantha. Voice recognition is having issues, but I'm here to help!");
+                }, 500);
+              }
+              
+              return;
+            }
+            
+            // Check if user can start free trial (trial is active and time left)
+            if (data.reason === 'Trial access active' && data.trialExpiresAt) {
+              const timeLeft = Math.max(0, Math.floor((new Date(data.trialExpiresAt).getTime() - Date.now()) / 1000));
+              if (timeLeft > 0) {
+                console.log('⏰ Trial user detected - starting trial conversation');
+                // Start free trial
+                setHasStarted(true);
+                conversationStartTimeRef.current = Date.now();
+                // Check microphone permission first
+                const currentPermission = microphonePermissionRef.current;
+                
+                if (!currentPermission.hasPermission && !currentPermission.isChecking) {
+                  const permissionGranted = await currentPermission.requestPermission();
+                  if (!permissionGranted) {
+                    onVoiceErrorRef.current?.('Microphone permission required. Please allow microphone access and try again.');
+                    return;
+                  }
+                }
+                
+                try {
+                  await fastVoiceRef.current.startListening();
+                  
+                  setTimeout(() => {
+                    fastVoiceRef.current.sendMessage("Hello, I'm Samantha. You have 3 minutes to try me out!");
+                  }, 500);
+                } catch (error) {
+                  console.error('❌ Voice recognition failed for trial:', error);
+                  const errorMessage = error instanceof Error ? error.message : 'Voice recognition failed';
+                  onVoiceErrorRef.current?.(errorMessage);
+                  // Fallback: still start conversation but show error
+                  setTimeout(() => {
+                    fastVoiceRef.current.sendMessage("Hello, I'm Samantha. Voice recognition is having issues, but I'm here to help!");
+                  }, 500);
+                }
+                
+                return;
+              }
+            }
+            
+            // If we get here, user needs to pay
+            console.log('💳 User needs payment - showing payment modal');
+            hasShownPaymentRef.current = true;
+            onRequirePaymentRef.current?.();
+          }
+        } catch (error) {
+          console.error('❌ Failed to check session access:', error);
+          // Session refresh failed silently
+        }
       } else {
-        // Trial already used, require payment
+        console.log('❌ No session ID available');
         hasShownPaymentRef.current = true;
         onRequirePaymentRef.current?.();
       }
@@ -354,7 +573,7 @@ export default function SecureVoiceManager({
     return () => {
       window.removeEventListener('startConversation', handleStartConversation);
     };
-  }, [hasStarted, sessionEnded, hasWalletAccess, realtimeVoice, textToSpeech]);
+  }, [hasStarted, sessionEnded, sessionId]);
 
   // Refs for callback stability
   const onSessionTimeChangeRef = useRef(onSessionTimeChange);
@@ -373,16 +592,23 @@ export default function SecureVoiceManager({
     onRequirePaymentRef.current = onRequirePayment;
   });
 
-  // Set up session timer
+  // Set up session timer - ONLY for trial users, not paid users
   useEffect(() => {
-    if (!hasStarted || sessionEnded) return;
+    if (!hasStarted || sessionEnded || hasWalletAccess) {
+      console.log('⏰ Timer not running:', { hasStarted, sessionEnded, hasWalletAccess });
+      return; // Don't run timer for paid users
+    }
 
+    console.log('⏰ Starting trial timer for user');
     const timer = setInterval(() => {
       const newTime = trialTimeLeft - 1;
       if (newTime <= 0) {
         clearInterval(timer);
+        console.log('⏰ Trial time expired, showing payment modal');
         setSessionEnded(true);
         onSessionEndedChange?.(true);
+        // Show payment modal instead of redirecting
+        onRequirePaymentRef.current?.();
         return;
       }
       setTrialTimeLeft(newTime);
@@ -390,7 +616,7 @@ export default function SecureVoiceManager({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [hasStarted, sessionEnded, onSessionEndedChange, onSessionTimeChange, MAX_CONVERSATION_TIME, realtimeVoice, trialTimeLeft]);
+  }, [hasStarted, sessionEnded, hasWalletAccess, onSessionEndedChange, onSessionTimeChange, trialTimeLeft]);
 
   // Don't render anything - this is a headless component
   return null;

@@ -44,25 +44,22 @@ export default function VoiceVisualization({
 
 
 
-  // COMPLETELY ISOLATED intro sequence - cannot be interrupted
+  // Simplified intro sequence - much faster and less laggy
   useEffect(() => {
     if (isIntroComplete) return; // Skip if already complete
     
-    const phase1 = setTimeout(() => setIntroPhase(1), 500);   // Particles appear
-    const phase2 = setTimeout(() => setIntroPhase(2), 1500);  // Text formation
-    const phase3 = setTimeout(() => setIntroPhase(3), 2500);  // Energy burst
-    const phase4 = setTimeout(() => setIntroPhase(4), 3500);  // Consciousness awakening
+    const phase1 = setTimeout(() => setIntroPhase(1), 200);   // Particles appear
+    const phase2 = setTimeout(() => setIntroPhase(2), 800);   // Text formation
+    const phase3 = setTimeout(() => setIntroPhase(3), 1400);  // Energy burst
+    const phase4 = setTimeout(() => setIntroPhase(4), 2000);  // Consciousness awakening
     
-    // Wait for ALL animations to complete before hiding intro
-    // Final pulse: starts at 4s, runs for 1s = finishes at 5s
-    // Energy burst: starts at 3.5s, runs for 2s = finishes at 5.5s
-    const hideIntro = setTimeout(() => setShowIntro(false), 6000); // 6 seconds
+    // Much shorter intro - 3 seconds total
+    const hideIntro = setTimeout(() => setShowIntro(false), 3000);
     
-    // Signal that intro is complete and other components can initialize
-    // Add extra buffer to ensure smooth transition
+    // Signal completion after 4 seconds
     const completeIntro = setTimeout(() => {
       onIntroComplete?.();
-    }, 8000); // 8 seconds total - plenty of buffer for smooth transition
+    }, 4000);
     
     return () => {
       clearTimeout(phase1);
@@ -154,10 +151,10 @@ export default function VoiceVisualization({
                 }}
               />
 
-              {/* Holographic Particle Field */}
+              {/* Holographic Particle Field - Reduced for performance */}
               {isMounted && introPhase >= 1 && (
                 <div className="absolute inset-0 overflow-hidden">
-                  {Array.from({ length: 120 }).map((_, i) => {
+                  {Array.from({ length: 30 }).map((_, i) => {
                     const x = Math.random() * 100;
                     const y = Math.random() * 100;
                     const delay = Math.random() * 2;
@@ -520,10 +517,10 @@ export default function VoiceVisualization({
                 }}
               />
 
-              {/* Enhanced Floating Particles - More and Bigger */}
+              {/* Enhanced Floating Particles - Reduced for performance */}
               {isMounted && (
                 <div className="absolute w-[90vw] h-[90vh] max-w-[500px] max-h-[500px] pointer-events-none">
-                  {Array.from({ length: 36 }).map((_, i) => {
+                  {Array.from({ length: 12 }).map((_, i) => {
                     const angle = (i * Math.PI * 2) / 36;
                     const baseRadius = 120;
                     const radiusVariation = Math.sin(i * 0.5) * 40;
@@ -576,17 +573,26 @@ export default function VoiceVisualization({
 
               {/* Central Organic Presence - Much Bigger */}
               <motion.div
-                className={`relative z-10 ${isReady && !hasStarted ? 'hover:scale-105 transition-transform duration-300' : ''}`}
+                className={`relative z-50 ${isReady && !hasStarted ? 'hover:scale-105 transition-transform duration-300' : ''}`}
                 onMouseEnter={() => setIsHovering(true)}
                 onMouseLeave={() => setIsHovering(false)}
                 onTouchStart={() => setIsTouching(true)}
                 onTouchEnd={() => setIsTouching(false)}
-                onClick={() => {
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+              
                         if (isReady && !hasStarted && isIntroComplete && onStartConversation) {
+                    
         onStartConversation();
+                  } else {
+
       }
                 }}
-                style={{ cursor: isReady && !hasStarted ? 'pointer' : 'default' }}
+                style={{ 
+                  cursor: isReady && !hasStarted ? 'pointer' : 'default',
+                  pointerEvents: isReady && !hasStarted ? 'auto' : 'none'
+                }}
               >
                 {/* Outer Organic Aura */}
                 <motion.div
@@ -774,6 +780,18 @@ export default function VoiceVisualization({
               >
                 {/* Click instruction that appears after intro when ready */}
                 {isReady && !hasStarted && isIntroComplete && (
+                  <motion.div
+                    className="text-center"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+              
+                      if (onStartConversation) {
+                        onStartConversation();
+                      }
+                    }}
+                    style={{ cursor: 'pointer', pointerEvents: 'auto' }}
+                  >
                   <motion.p
                     className="text-white/60 text-sm font-light mb-4 cursor-pointer hover:text-white/80 transition-colors"
                     initial={{ opacity: 0 }}
@@ -782,6 +800,7 @@ export default function VoiceVisualization({
                   >
                     Click to begin conversation
                   </motion.p>
+                  </motion.div>
                 )}
                 
                 <motion.div

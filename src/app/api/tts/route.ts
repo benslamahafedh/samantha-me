@@ -17,12 +17,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
 
-    // Use OpenAI TTS with the highest quality model and most natural voice
+    // Use OpenAI TTS with faster model for speed while maintaining quality
     const mp3 = await openai.audio.speech.create({
-      model: 'tts-1-hd', // Highest quality TTS model
+      model: 'tts-1', // Faster TTS model (still high quality)
       voice: 'nova', // Most natural and expressive voice - perfect for waifu personality
       input: text,
-      speed: 0.95, // Slightly slower for more seductive, warm delivery
+      speed: 1.1, // Slightly faster for quicker responses
     });
 
     // Convert the response to a buffer

@@ -4,7 +4,6 @@ import React, { useState, useCallback } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { Connection, PublicKey, Transaction, SystemProgram, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { getSessionManager } from '@/lib/sessionManager';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -114,9 +113,8 @@ export default function PaymentModal({ isOpen, onClose, onPaymentSuccess }: Paym
         throw new Error(verifyData.error || 'Payment verification failed');
       }
 
-      // Only mark as paid after blockchain verification succeeds
-      const sessionManager = getSessionManager();
-      sessionManager.markAsPaid(publicKey.toBase58(), signature);
+      // Payment verified successfully
+      console.log('✅ Payment verified and processed');
 
       // Success
       onPaymentSuccess();

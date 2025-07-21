@@ -11,12 +11,7 @@ export default function Debug() {
     canStart: boolean;
     timestamp: string;
   };
-  type TimerInfo = {
-    timeLeft: number;
-    timestamp: string;
-  };
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
-  const [timerInfo, setTimerInfo] = useState<TimerInfo | null>(null);
   const speechRecognition = useSpeechRecognition();
 
   useEffect(() => {
@@ -26,37 +21,27 @@ export default function Debug() {
     
     // Get initial session info
     const updateSessionInfo = () => {
-      const data = sessionManager.getSessionData();
+      const sessionInfo = sessionManager.getSessionInfo();
       const remaining = sessionManager.getRemainingFreeTime();
       const canStart = sessionManager.canStartSession();
       
       setSessionInfo({
-        data,
+        data: sessionInfo,
         remaining,
         canStart,
         timestamp: new Date().toLocaleTimeString()
       });
       
-      console.log('📊 Session info updated:', { data, remaining, canStart });
+      console.log('📊 Session info updated:', { sessionInfo, remaining, canStart });
     };
     
     updateSessionInfo();
-    
-    // Set up timer listener
-    sessionManager.onTimeUpdate((timeLeft) => {
-      setTimerInfo({
-        timeLeft,
-        timestamp: new Date().toLocaleTimeString()
-      });
-      console.log('⏰ Timer update:', timeLeft);
-    });
     
     // Update session info every 2 seconds
     const interval = setInterval(updateSessionInfo, 2000);
     
     return () => {
       clearInterval(interval);
-      sessionManager.destroy();
     };
   }, []);
 
@@ -112,23 +97,23 @@ export default function Debug() {
           )}
         </div>
 
-        {/* Timer Info */}
+        {/* Session Timer */}
         <div className="bg-gray-800 p-4 rounded-lg">
-          <h2 className="text-lg font-semibold mb-4">Timer</h2>
-          {timerInfo ? (
+          <h2 className="text-lg font-semibold mb-4">Session Timer</h2>
+          {sessionInfo ? (
             <div className="space-y-2 text-sm">
               <div>
-                <strong>Time Left:</strong> {timerInfo.timeLeft}s
+                <strong>Time Left:</strong> {sessionInfo.remaining}s
               </div>
               <div>
-                <strong>Last Update:</strong> {timerInfo.timestamp}
+                <strong>Last Update:</strong> {sessionInfo.timestamp}
               </div>
-              <div className={`text-2xl font-bold ${timerInfo.timeLeft <= 30 ? 'text-red-400' : 'text-green-400'}`}>
-                {Math.floor(timerInfo.timeLeft / 60)}:{(timerInfo.timeLeft % 60).toString().padStart(2, '0')}
+              <div className={`text-2xl font-bold ${sessionInfo.remaining <= 30 ? 'text-red-400' : 'text-green-400'}`}>
+                {Math.floor(sessionInfo.remaining / 60)}:{(sessionInfo.remaining % 60).toString().padStart(2, '0')}
               </div>
             </div>
           ) : (
-            <div className="text-gray-400">No timer data yet</div>
+            <div className="text-gray-400">No session data yet</div>
           )}
         </div>
 

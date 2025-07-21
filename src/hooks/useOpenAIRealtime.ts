@@ -31,7 +31,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
   const lastResponseRef = useRef<string>('');
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const PROCESSING_COOLDOWN = 200; // 0.2 seconds between processing for ultra-responsive conversation
+  const PROCESSING_COOLDOWN = 100; // 0.1 seconds between processing for ultra-responsive conversation
   const MIN_AUDIO_LEVEL = 0.01; // Minimum audio level threshold
 
   // Helper function to check if text is meaningful - much more permissive for natural conversation
@@ -155,7 +155,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
     if (!isSupported || isListening) return;
 
     try {
-      // Enhanced audio constraints for better quality
+      // Try to get microphone access directly - this is more reliable than permissions API
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: true,
@@ -180,7 +180,8 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
       analyserRef.current = analyser;
       
       const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus'
+        mimeType: 'audio/webm;codecs=opus',
+        audioBitsPerSecond: 64000 // Lower bitrate for faster processing
       });
       
       const audioChunks: Blob[] = [];
@@ -227,9 +228,9 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
           // Combine all audio chunks
           const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
           
-          // Only process if we have substantial audio (> 1.5 seconds for better accuracy)
+          // Only process if we have substantial audio (> 1 second for faster response)
           const recordingDuration = Date.now() - recordingStartTime;
-          if (recordingDuration < 1500) {
+          if (recordingDuration < 1000) {
             console.log('⚠️ Recording too short, ignoring');
             return;
           }
@@ -290,7 +291,7 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
                   },
                   body: JSON.stringify({
                     message: transcribedText,
-                    conversationHistory: conversationHistoryRef.current.slice(-10)
+                    conversationHistory: conversationHistoryRef.current.slice(-6) // Only last 3 exchanges
                   }),
                 });
 
@@ -315,7 +316,16 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
                 
                 const responseTime = Date.now() - startTime;
                 console.log(`⚡ Response generated in ${responseTime}ms`);
+                
+                // Start TTS immediately while continuing to listen
                 speakResponse(data.response);
+                
+                // Immediately restart listening for faster conversation flow
+                setTimeout(() => {
+                  if (!isListening) {
+                    startListening();
+                  }
+                }, 25); // Very short delay for ultra-responsive conversation
                 
               } catch {
                 setError('Failed to process your message');
@@ -339,11 +349,11 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
         // Clear chunks for next recording
         audioChunks.length = 0;
         
-        // Auto-restart listening for continuous conversation - more aggressive
+        // Auto-restart listening for continuous conversation - ultra-fast
         setTimeout(() => {
           console.log('🔄 Auto-restarting listening for continuous conversation');
           startListening();
-        }, 200); // Short delay to ensure clean restart
+        }, 50); // Ultra-short delay for faster response
       };
       
       mediaRecorderRef.current = mediaRecorder;
@@ -361,9 +371,21 @@ export const useOpenAIRealtime = (): UseOpenAIRealtimeReturn => {
         }
       }, 8000);
       
-    } catch {
-      console.error('Failed to start listening');
-      setError('Failed to start voice recognition');
+    } catch (error) {
+      console.error('Failed to start listening:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start voice recognition';
+      setError(errorMessage);
+      
+      // Try to provide helpful guidance
+      if (errorMessage.includes('denied') || errorMessage.includes('permission')) {
+        setError('Microphone access denied. Please click the microphone icon in your browser address bar and allow access, then try again.');
+      } else if (errorMessage.includes('not found') || errorMessage.includes('no microphone')) {
+        setError('No microphone found. Please connect a microphone and try again.');
+      } else if (errorMessage.includes('NotAllowedError')) {
+        setError('Microphone access blocked. Please allow microphone access in your browser settings.');
+      } else {
+        setError('Voice recognition failed. Please check your microphone and try again.');
+      }
     }
   }, [isListening, isConnected, initializeWebSocket, isMeaningfulSpeech, speakResponse, isSupported]);
 
