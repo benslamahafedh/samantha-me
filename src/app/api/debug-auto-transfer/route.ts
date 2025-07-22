@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Connection, PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
-import { autoTransferManager } from '@/lib/autoTransferManager';
+import { getMinimalAutoTransferAsync } from '@/lib/minimalAutoTransfer';
 import { Database } from '@/lib/database';
 import { SessionManager } from '@/lib/sessionManager';
+
+// Only import Solana libraries on server-side
+let Connection: any, PublicKey: any, LAMPORTS_PER_SOL: any;
+
+if (typeof window === 'undefined') {
+  const solanaWeb3 = require('@solana/web3.js');
+  Connection = solanaWeb3.Connection;
+  PublicKey = solanaWeb3.PublicKey;
+  LAMPORTS_PER_SOL = solanaWeb3.LAMPORTS_PER_SOL;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -64,6 +73,7 @@ export async function GET(req: NextRequest) {
     }
     
     // Get auto-transfer stats
+    const autoTransferManager = await getMinimalAutoTransferAsync();
     const autoTransferStats = await autoTransferManager.getTransferStats();
     
     // Test a single transfer if there are eligible users
@@ -164,6 +174,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const { action, sessionId } = await req.json();
+    const autoTransferManager = await getMinimalAutoTransferAsync();
     
     switch (action) {
       case 'force_transfer_all':

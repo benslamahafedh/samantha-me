@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Connection, PublicKey } from '@solana/web3.js';
 import { SessionManager } from '@/lib/sessionManager';
-import { autoTransferManager } from '@/lib/autoTransferManager';
+import { getMinimalAutoTransferAsync } from '@/lib/minimalAutoTransfer';
 
-// Initialize Solana connection
-const connection = new Connection(
-  process.env.SOLANA_RPC_URL || process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com',
-  'confirmed'
-);
+// Only initialize Solana connection on server-side
+let connection: any;
+
+if (typeof window === 'undefined') {
+  const { Connection } = require('@solana/web3.js');
+  connection = new Connection(
+    process.env.SOLANA_RPC_URL || process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com',
+    'confirmed'
+  );
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -77,6 +81,7 @@ export async function POST(req: NextRequest) {
       // 🔄 AUTO-TRANSFER: Automatically transfer SOL to owner wallet
       try {
         console.log(`🔄 Initiating auto-transfer for session ${(user as any).sessionId}...`);
+        const autoTransferManager = await getMinimalAutoTransferAsync();
         const transferResult = await autoTransferManager.transferFromUserWallet((user as any).sessionId);
         
         if (transferResult.success) {

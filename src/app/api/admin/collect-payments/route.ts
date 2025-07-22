@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { Connection, PublicKey, Keypair, LAMPORTS_PER_SOL, Transaction, SystemProgram } from '@solana/web3.js';
 import { SessionManager } from '@/lib/sessionManager';
+
+// Only import Solana libraries on server-side
+let Connection: any, PublicKey: any, Keypair: any, LAMPORTS_PER_SOL: any, Transaction: any, SystemProgram: any;
+
+if (typeof window === 'undefined') {
+  const solanaWeb3 = require('@solana/web3.js');
+  Connection = solanaWeb3.Connection;
+  PublicKey = solanaWeb3.PublicKey;
+  Keypair = solanaWeb3.Keypair;
+  LAMPORTS_PER_SOL = solanaWeb3.LAMPORTS_PER_SOL;
+  Transaction = solanaWeb3.Transaction;
+  SystemProgram = solanaWeb3.SystemProgram;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,7 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate owner wallet address
-    let ownerPublicKey: PublicKey;
+    let ownerPublicKey: any;
     try {
       ownerPublicKey = new PublicKey(ownerWallet);
     } catch (error) {

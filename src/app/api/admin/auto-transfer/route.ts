@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { autoTransferManager } from '@/lib/autoTransferManager';
+import { getMinimalAutoTransferAsync } from '@/lib/minimalAutoTransfer';
 
 export async function POST(req: NextRequest) {
   try {
     const { action, sessionId } = await req.json();
+    const autoTransferManager = await getMinimalAutoTransferAsync();
 
     switch (action) {
       case 'transfer_all':
@@ -70,6 +71,7 @@ export async function POST(req: NextRequest) {
 export async function GET() {
   try {
     // Get auto-transfer statistics
+    const autoTransferManager = await getMinimalAutoTransferAsync();
     const stats = await autoTransferManager.getTransferStats();
     
     return NextResponse.json({

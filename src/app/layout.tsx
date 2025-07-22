@@ -4,13 +4,8 @@ import "./mobile-optimizations.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import WalletProvider from "@/components/WalletProvider";
 
-// Initialize auto-transfer manager on server start only
-if (typeof window === 'undefined' && process.env.NODE_ENV === 'production') {
-  // Server-side initialization only in production
-  import('@/lib/initAutoTransfer').then(({ initializeAutoTransfer }) => {
-    initializeAutoTransfer();
-  }).catch(console.error);
-}
+// Auto-transfer initialization moved to runtime only
+// No build-time initialization to prevent deployment issues
 
 export const metadata: Metadata = {
   title: "Samantha - Voice Assistant",

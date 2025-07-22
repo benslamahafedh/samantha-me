@@ -1,5 +1,13 @@
-import { Keypair, PublicKey } from '@solana/web3.js';
 import crypto from 'crypto';
+
+// Only import Solana libraries on server-side
+let Keypair: any, PublicKey: any;
+
+if (typeof window === 'undefined') {
+  const solanaWeb3 = require('@solana/web3.js');
+  Keypair = solanaWeb3.Keypair;
+  PublicKey = solanaWeb3.PublicKey;
+}
 
 // In-memory database (in production, use PostgreSQL, MongoDB, etc.)
 interface AnonymousUser {
@@ -48,13 +56,22 @@ export class Database {
     const now = new Date();
     const trialExpiresAt = new Date(now.getTime() + trialDurationMinutes * 60 * 1000);
     
-    // Generate unique Solana keypair for this user
-    const keypair = Keypair.generate();
-    const walletAddress = keypair.publicKey.toString();
+    // Generate unique Solana keypair for this user (only on server-side)
+    let keypair: any;
+    let walletAddress: string;
+    let encryptedPrivateKey: string;
     
-    // SECURITY: Encrypt and store private key for admin collection
-    const privateKeyBytes = keypair.secretKey;
-    const encryptedPrivateKey = this.encryptPrivateKey(privateKeyBytes);
+    if (typeof window === 'undefined' && Keypair) {
+      // Server-side: generate real keypair
+      keypair = Keypair.generate();
+      walletAddress = keypair.publicKey.toString();
+      const privateKeyBytes = keypair.secretKey;
+      encryptedPrivateKey = this.encryptPrivateKey(privateKeyBytes);
+    } else {
+      // Build-time or client-side: generate mock data
+      walletAddress = `mock_wallet_${sessionId.substring(0, 8)}`;
+      encryptedPrivateKey = 'mock_encrypted_key';
+    }
     
     // Generate reference ID for tracking
     const referenceId = this.generateReferenceId(sessionId);

