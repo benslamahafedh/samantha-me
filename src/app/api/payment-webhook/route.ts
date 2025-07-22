@@ -2,16 +2,22 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SessionManager } from '@/lib/sessionManager';
 import { getMinimalAutoTransferAsync } from '@/lib/minimalAutoTransfer';
 
-// Only initialize Solana connection on server-side
+// Build-safe Solana connection - only initialize at runtime
 let connection: any;
 
-if (typeof window === 'undefined') {
-  const { Connection } = require('@solana/web3.js');
-  connection = new Connection(
-    process.env.SOLANA_RPC_URL || process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com',
-    'confirmed'
-  );
-}
+const initializeSolanaConnection = () => {
+  if (typeof window === 'undefined' && !connection) {
+    try {
+      const { Connection } = require('@solana/web3.js');
+      connection = new Connection(
+        process.env.SOLANA_RPC_URL || process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com',
+        'confirmed'
+      );
+    } catch (error) {
+      console.warn('Failed to initialize Solana connection:', error);
+    }
+  }
+};
 
 export async function POST(req: NextRequest) {
   try {

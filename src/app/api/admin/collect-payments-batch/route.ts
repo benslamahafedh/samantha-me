@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SessionManager } from '@/lib/sessionManager';
 
-// Only import Solana libraries on server-side
+// Build-safe Solana imports - only load at runtime
 let Connection: any, PublicKey: any, Keypair: any, LAMPORTS_PER_SOL: any, Transaction: any, SystemProgram: any;
 
-if (typeof window === 'undefined') {
-  const solanaWeb3 = require('@solana/web3.js');
-  Connection = solanaWeb3.Connection;
-  PublicKey = solanaWeb3.PublicKey;
-  Keypair = solanaWeb3.Keypair;
-  LAMPORTS_PER_SOL = solanaWeb3.LAMPORTS_PER_SOL;
-  Transaction = solanaWeb3.Transaction;
-  SystemProgram = solanaWeb3.SystemProgram;
-}
+const loadSolanaLibraries = () => {
+  if (typeof window === 'undefined' && !Connection) {
+    try {
+      const solanaWeb3 = require('@solana/web3.js');
+      Connection = solanaWeb3.Connection;
+      PublicKey = solanaWeb3.PublicKey;
+      Keypair = solanaWeb3.Keypair;
+      LAMPORTS_PER_SOL = solanaWeb3.LAMPORTS_PER_SOL;
+      Transaction = solanaWeb3.Transaction;
+      SystemProgram = solanaWeb3.SystemProgram;
+    } catch (error) {
+      console.warn('Failed to load Solana libraries:', error);
+    }
+  }
+};
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,6 +29,17 @@ export async function POST(req: NextRequest) {
         success: false, 
         error: 'Owner wallet address is required' 
       }, { status: 400 });
+    }
+
+    // Load Solana libraries at runtime
+    loadSolanaLibraries();
+
+    // Check if Solana libraries are available
+    if (!PublicKey || !Connection) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Solana libraries not available during build' 
+      }, { status: 503 });
     }
 
     // Validate owner wallet address

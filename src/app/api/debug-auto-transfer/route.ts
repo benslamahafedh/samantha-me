@@ -3,18 +3,36 @@ import { getMinimalAutoTransferAsync } from '@/lib/minimalAutoTransfer';
 import { Database } from '@/lib/database';
 import { SessionManager } from '@/lib/sessionManager';
 
-// Only import Solana libraries on server-side
+// Build-safe Solana imports - only load at runtime
 let Connection: any, PublicKey: any, LAMPORTS_PER_SOL: any;
 
-if (typeof window === 'undefined') {
-  const solanaWeb3 = require('@solana/web3.js');
-  Connection = solanaWeb3.Connection;
-  PublicKey = solanaWeb3.PublicKey;
-  LAMPORTS_PER_SOL = solanaWeb3.LAMPORTS_PER_SOL;
-}
+const loadSolanaLibraries = () => {
+  if (typeof window === 'undefined' && !Connection) {
+    try {
+      const solanaWeb3 = require('@solana/web3.js');
+      Connection = solanaWeb3.Connection;
+      PublicKey = solanaWeb3.PublicKey;
+      LAMPORTS_PER_SOL = solanaWeb3.LAMPORTS_PER_SOL;
+    } catch (error) {
+      console.warn('Failed to load Solana libraries:', error);
+    }
+  }
+};
 
 export async function GET(req: NextRequest) {
   try {
+    // Load Solana libraries at runtime
+    loadSolanaLibraries();
+
+    // Check if Solana libraries are available
+    if (!Connection || !PublicKey || !LAMPORTS_PER_SOL) {
+      return NextResponse.json({
+        success: false,
+        error: 'Solana libraries not available during build',
+        buildSafe: true
+      }, { status: 503 });
+    }
+
     console.log('🔍 Debug auto-transfer system...');
     
     const database = Database.getInstance();
