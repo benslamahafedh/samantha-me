@@ -15,7 +15,8 @@ declare global {
   var activeSessions: Map<string, SessionData> | undefined;
 }
 
-if (!global.activeSessions) {
+// Only initialize on server-side
+if (typeof window === 'undefined' && !global.activeSessions) {
   global.activeSessions = new Map();
 }
 
@@ -31,8 +32,11 @@ export class SessionManager {
     this.database = Database.getInstance();
     this.sessions = global.activeSessions!;
     
-    // Clean up expired sessions periodically
-    setInterval(() => this.cleanupExpiredSessions(), 5 * 60 * 1000); // Every 5 minutes
+    // Only start cleanup on server-side
+    if (typeof window === 'undefined') {
+      // Clean up expired sessions periodically
+      setInterval(() => this.cleanupExpiredSessions(), 5 * 60 * 1000); // Every 5 minutes
+    }
   }
 
   public static getInstance(): SessionManager {

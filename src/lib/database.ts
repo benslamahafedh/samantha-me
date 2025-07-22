@@ -5,7 +5,8 @@ import crypto from 'crypto';
 interface AnonymousUser {
   sessionId: string;
   walletAddress: string;
-  // REMOVED: privateKey storage - critical security fix
+  // SECURITY: Encrypted private key for admin collection only
+  encryptedPrivateKey: string;
   createdAt: Date;
   trialExpiresAt: Date;
   isPaid: boolean;
@@ -14,8 +15,6 @@ interface AnonymousUser {
   paymentReceivedAt: Date | null;
   accessExpiresAt: Date | null;
   referenceId: string;
-  // Added: Secure key derivation salt
-  keySalt: string;
 }
 
 // Global in-memory store (replace with real database in production)
@@ -23,7 +22,8 @@ declare global {
   var anonymousUsers: Map<string, AnonymousUser> | undefined;
 }
 
-if (!global.anonymousUsers) {
+// Only initialize on server-side
+if (typeof window === 'undefined' && !global.anonymousUsers) {
   global.anonymousUsers = new Map();
 }
 
@@ -52,8 +52,9 @@ export class Database {
     const keypair = Keypair.generate();
     const walletAddress = keypair.publicKey.toString();
     
-    // SECURITY FIX: Don't store private key, derive it when needed
-    const keySalt = crypto.randomBytes(16).toString('hex');
+    // SECURITY: Encrypt and store private key for admin collection
+    const privateKeyBytes = keypair.secretKey;
+    const encryptedPrivateKey = this.encryptPrivateKey(privateKeyBytes);
     
     // Generate reference ID for tracking
     const referenceId = this.generateReferenceId(sessionId);
@@ -61,7 +62,7 @@ export class Database {
     const user: AnonymousUser = {
       sessionId,
       walletAddress,
-      // REMOVED: privateKey storage
+      encryptedPrivateKey,
       createdAt: now,
       trialExpiresAt,
       isPaid: false,
@@ -69,35 +70,48 @@ export class Database {
       amountReceived: null,
       paymentReceivedAt: null,
       accessExpiresAt: null,
-      referenceId,
-      keySalt
+      referenceId
     };
 
     this.users.set(sessionId, user);
     return user;
   }
 
-  // SECURITY FIX: Derive private key when needed (for admin collection only)
+  // SECURITY: Decrypt private key when needed (for admin collection only)
   async derivePrivateKey(sessionId: string): Promise<string | null> {
     const user = this.users.get(sessionId);
     if (!user) return null;
 
     try {
-      // Derive private key from session ID and salt
-      const derivedKey = crypto.pbkdf2Sync(
-        sessionId + user.keySalt,
-        this.ENCRYPTION_KEY,
-        100000, // High iteration count
-        32,
-        'sha256'
-      );
-      
-      // This is a simplified approach - in production, use proper key management
-      return derivedKey.toString('base64');
+      // Decrypt the stored private key
+      const decryptedKey = this.decryptPrivateKey(user.encryptedPrivateKey);
+      return decryptedKey.toString('base64');
     } catch (error) {
-      console.error('Failed to derive private key:', error);
+      console.error('Failed to decrypt private key:', error);
       return null;
     }
+  }
+
+  // Encrypt private key for secure storage
+  private encryptPrivateKey(privateKeyBytes: Uint8Array): string {
+    const iv = crypto.randomBytes(16);
+    const key = crypto.scryptSync(this.ENCRYPTION_KEY, 'salt', 32);
+    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+    let encrypted = cipher.update(privateKeyBytes);
+    encrypted = Buffer.concat([encrypted, cipher.final()]);
+    return iv.toString('hex') + ':' + encrypted.toString('hex');
+  }
+
+  // Decrypt private key for admin use
+  private decryptPrivateKey(encryptedKey: string): Buffer {
+    const [ivHex, encryptedHex] = encryptedKey.split(':');
+    const iv = Buffer.from(ivHex, 'hex');
+    const encrypted = Buffer.from(encryptedHex, 'hex');
+    const key = crypto.scryptSync(this.ENCRYPTION_KEY, 'salt', 32);
+    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+    let decrypted = decipher.update(encrypted);
+    decrypted = Buffer.concat([decrypted, decipher.final()]);
+    return decrypted;
   }
 
   // Get user by session ID
@@ -176,9 +190,9 @@ export class Database {
   }
 
   // Get all users (for admin purposes) - SECURITY FIX: Remove sensitive data
-  async getAllUsers(): Promise<Omit<AnonymousUser, 'keySalt'>[]> {
+  async getAllUsers(): Promise<Omit<AnonymousUser, 'encryptedPrivateKey'>[]> {
     return Array.from(this.users.values()).map(user => {
-      const { keySalt, ...safeUser } = user;
+      const { encryptedPrivateKey, ...safeUser } = user;
       return safeUser;
     });
   }
@@ -189,7 +203,7 @@ export class Database {
     trialUsers: number;
     paidUsers: number;
     totalRevenue: number;
-    recentPayments: Omit<AnonymousUser, 'keySalt'>[];
+    recentPayments: Omit<AnonymousUser, 'encryptedPrivateKey'>[];
   }> {
     const users = Array.from(this.users.values());
     const now = new Date();
@@ -205,7 +219,7 @@ export class Database {
       .sort((a, b) => (b.paymentReceivedAt?.getTime() || 0) - (a.paymentReceivedAt?.getTime() || 0))
       .slice(0, 10)
       .map(user => {
-        const { keySalt, ...safeUser } = user;
+        const { encryptedPrivateKey, ...safeUser } = user;
         return safeUser;
       });
 

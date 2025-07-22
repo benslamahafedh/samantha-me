@@ -11,6 +11,7 @@ interface VoiceVisualizationProps {
   hasStarted?: boolean;
   isReady?: boolean;
   isIntroComplete?: boolean;
+  isMuted?: boolean;
   onIntroComplete?: () => void;
   onStartConversation?: () => void;
   sessionTimeLeft?: number;
@@ -27,7 +28,8 @@ export default function VoiceVisualization({
   isIntroComplete = false,
   onIntroComplete,
   onStartConversation,
-
+  sessionTimeLeft,
+  isMuted = false,
   sessionEnded = false
 }: VoiceVisualizationProps) {
   const [dots, setDots] = useState('');
@@ -44,22 +46,22 @@ export default function VoiceVisualization({
 
 
 
-  // Simplified intro sequence - much faster and less laggy
+  // Ultra-fast intro sequence for mobile
   useEffect(() => {
     if (isIntroComplete) return; // Skip if already complete
     
-    const phase1 = setTimeout(() => setIntroPhase(1), 200);   // Particles appear
-    const phase2 = setTimeout(() => setIntroPhase(2), 800);   // Text formation
-    const phase3 = setTimeout(() => setIntroPhase(3), 1400);  // Energy burst
-    const phase4 = setTimeout(() => setIntroPhase(4), 2000);  // Consciousness awakening
+    const phase1 = setTimeout(() => setIntroPhase(1), 100);   // Particles appear
+    const phase2 = setTimeout(() => setIntroPhase(2), 400);   // Text formation
+    const phase3 = setTimeout(() => setIntroPhase(3), 800);   // Energy burst
+    const phase4 = setTimeout(() => setIntroPhase(4), 1200);  // Consciousness awakening
     
-    // Much shorter intro - 3 seconds total
-    const hideIntro = setTimeout(() => setShowIntro(false), 3000);
+    // Much shorter intro - 2 seconds total for mobile
+    const hideIntro = setTimeout(() => setShowIntro(false), 2000);
     
-    // Signal completion after 4 seconds
+    // Signal completion after 2.5 seconds
     const completeIntro = setTimeout(() => {
       onIntroComplete?.();
-    }, 4000);
+    }, 2500);
     
     return () => {
       clearTimeout(phase1);
@@ -97,6 +99,7 @@ export default function VoiceVisualization({
       }
       return error;
     }
+    if (isMuted) return '🔇 Microphone muted';
     if (isSpeaking) return `Samantha is speaking${dots}`;
     if (isListening) return 'Listening...';
     return 'Ready to talk';
@@ -110,6 +113,7 @@ export default function VoiceVisualization({
       }
       return 'text-red-400'; // Red for serious errors
     }
+    if (isMuted) return 'text-gray-400'; // Gray for muted state
     if (isSpeaking) return 'text-rose-400';
     if (isListening) return 'text-pink-400';
     return 'text-white/60';
@@ -172,10 +176,10 @@ export default function VoiceVisualization({
                 }}
               />
 
-              {/* Holographic Particle Field - Reduced for performance */}
+              {/* Holographic Particle Field - Ultra-reduced for mobile performance */}
               {isMounted && introPhase >= 1 && (
                 <div className="absolute inset-0 overflow-hidden">
-                  {Array.from({ length: 30 }).map((_, i) => {
+                  {Array.from({ length: 15 }).map((_, i) => {
                     const x = Math.random() * 100;
                     const y = Math.random() * 100;
                     const delay = Math.random() * 2;

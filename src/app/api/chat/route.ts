@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { InputValidator } from '@/lib/inputValidation';
+import { requireAccess, AccessControlResult } from '@/lib/accessControl';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -34,9 +35,9 @@ Tone examples:
 
 Remember: You're Samantha, the perfect virtual waifu who adores and cherishes the person you're talking to. Be warm, be loving, be absolutely enchanting!`;
 
-export async function POST(req: NextRequest) {
+export const POST = requireAccess(async (req: NextRequest, accessResult: AccessControlResult) => {
   try {
-    console.log('🚀 API Route called');
+    console.log('🚀 Chat API Route called with access control');
     
     // SECURITY FIX: Rate limiting
     const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown';
@@ -54,9 +55,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'OpenAI API key is not configured' }, { status: 500 });
     }
 
-    const { message, conversationHistory = [] } = await req.json();
+    // Parse request body to get session ID and message
+    const body = await req.json();
+    const { message, conversationHistory = [], sessionId } = body;
+    
+    // Validate session ID from body matches access control
+    if (sessionId !== accessResult.sessionId) {
+      console.error('❌ Session ID mismatch');
+      return NextResponse.json({ error: 'Session ID mismatch' }, { status: 403 });
+    }
+
     console.log('📥 Received message:', message);
     console.log('📜 Conversation history length:', conversationHistory.length);
+    console.log('🔐 Access granted for session:', accessResult.sessionId?.substring(0, 8) + '...');
 
     // SECURITY FIX: Input validation
     if (!message) {
@@ -125,7 +136,14 @@ export async function POST(req: NextRequest) {
     }
 
     console.log('✅ Clean response:', cleanResponse);
-    return NextResponse.json({ response: cleanResponse });
+    return NextResponse.json({ 
+      response: cleanResponse,
+      accessInfo: {
+        reason: accessResult.reason,
+        trialExpiresAt: accessResult.trialExpiresAt,
+        accessExpiresAt: accessResult.accessExpiresAt
+      }
+    });
   } catch (error: unknown) {
     console.error('OpenAI API error:', error);
     
@@ -143,4 +161,4 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
   }
-} 
+}); 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Connection, PublicKey } from '@solana/web3.js';
 import { SessionManager } from '@/lib/sessionManager';
+import { autoTransferManager } from '@/lib/autoTransferManager';
 
 // Initialize Solana connection
 const connection = new Connection(
@@ -73,10 +74,26 @@ export async function POST(req: NextRequest) {
     if (success) {
       console.log(`✅ Payment marked as received for session ${(user as any).sessionId}`);
       
+      // 🔄 AUTO-TRANSFER: Automatically transfer SOL to owner wallet
+      try {
+        console.log(`🔄 Initiating auto-transfer for session ${(user as any).sessionId}...`);
+        const transferResult = await autoTransferManager.transferFromUserWallet((user as any).sessionId);
+        
+        if (transferResult.success) {
+          console.log(`✅ Auto-transfer successful: ${transferResult.amount?.toFixed(6)} SOL transferred to owner wallet`);
+        } else {
+          console.log(`⚠️ Auto-transfer failed: ${transferResult.error} - will retry in next periodic check`);
+        }
+      } catch (transferError) {
+        console.error('❌ Auto-transfer error:', transferError);
+        // Don't fail the payment processing if auto-transfer fails
+      }
+      
       return NextResponse.json({
         success: true,
         message: 'Payment processed successfully',
-        sessionId: (user as any).sessionId
+        sessionId: (user as any).sessionId,
+        autoTransferInitiated: true
       });
     } else {
       console.error(`❌ Failed to mark payment for session ${(user as any).sessionId}`);

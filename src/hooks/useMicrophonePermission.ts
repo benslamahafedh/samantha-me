@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 interface UseMicrophonePermissionReturn {
   hasPermission: boolean;
@@ -97,11 +97,11 @@ export const useMicrophonePermission = (): UseMicrophonePermissionReturn => {
     checkPermission();
   }, []);
 
-  return {
+  return useMemo(() => ({
     hasPermission,
     isChecking,
     error,
     requestPermission,
     checkPermission
-  };
+  }), [hasPermission, isChecking, error, requestPermission, checkPermission]);
 }; 

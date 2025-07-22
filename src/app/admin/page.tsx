@@ -30,6 +30,8 @@ export default function AdminDashboard() {
   const [rpcUrl, setRpcUrl] = useState('https://api.mainnet-beta.solana.com');
   const [useBatchMode, setUseBatchMode] = useState(false);
   const [batchSize, setBatchSize] = useState(10);
+  const [autoTransferStats, setAutoTransferStats] = useState<any>(null);
+  const [autoTransferLoading, setAutoTransferLoading] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -48,6 +50,13 @@ export default function AdminDashboard() {
       const usersResponse = await fetch('/api/admin/users');
       const usersData = await usersResponse.json();
       setUsers(usersData.users || []);
+
+      // Load auto-transfer stats
+      const autoTransferResponse = await fetch('/api/admin/auto-transfer');
+      const autoTransferData = await autoTransferResponse.json();
+      if (autoTransferData.success) {
+        setAutoTransferStats(autoTransferData.stats);
+      }
     } catch (error) {
       console.error('Failed to load admin data:', error);
     } finally {
@@ -113,6 +122,32 @@ export default function AdminDashboard() {
     return `${amount.toFixed(4)} SOL`;
   };
 
+  const triggerAutoTransfer = async (action: 'transfer_all' | 'transfer_single', sessionId?: string) => {
+    try {
+      setAutoTransferLoading(true);
+      
+      const response = await fetch('/api/admin/auto-transfer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, sessionId })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        alert(result.message);
+        loadData(); // Refresh data
+      } else {
+        alert(`Error: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Failed to trigger auto-transfer:', error);
+      alert('Failed to trigger auto-transfer');
+    } finally {
+      setAutoTransferLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="text-center">
@@ -149,9 +184,53 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Auto-Transfer Section */}
+        <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-8">
+          <h2 className="text-xl font-semibold mb-4">🤖 Auto-Transfer System</h2>
+          
+          {autoTransferStats && (
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-gray-400 text-sm">Owner Wallet</h3>
+                <p className="text-sm font-mono text-green-400">{autoTransferStats.ownerWallet}</p>
+              </div>
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-gray-400 text-sm">Min Transfer</h3>
+                <p className="text-sm text-blue-400">{autoTransferStats.minTransferAmount} SOL</p>
+              </div>
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-gray-400 text-sm">Gas Reserve</h3>
+                <p className="text-sm text-yellow-400">{autoTransferStats.gasReserve} SOL</p>
+              </div>
+              <div className="bg-gray-700 rounded-lg p-4">
+                <h3 className="text-gray-400 text-sm">Periodic Transfers</h3>
+                <p className="text-sm text-purple-400">
+                  {autoTransferStats.isPeriodicTransfersActive ? '🟢 Active' : '🔴 Inactive'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-4">
+            <button
+              onClick={() => triggerAutoTransfer('transfer_all')}
+              disabled={autoTransferLoading}
+              className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 disabled:opacity-50 rounded-lg px-6 py-3 font-medium transition-all duration-300"
+            >
+              {autoTransferLoading ? 'Processing...' : '🤖 Auto-Transfer All SOL'}
+            </button>
+            
+            <div className="text-sm text-gray-400">
+              <p>• Automatically transfers SOL to: HiUtCXm3qZ2TG6hgnc6ABfUtuf7HkBmDK3ZEZ2oMK7m6</p>
+              <p>• Runs every 30 minutes automatically</p>
+              <p>• Also triggers when new payments are received</p>
+            </div>
+          </div>
+        </div>
+
         {/* Collection Section */}
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 mb-8">
-          <h2 className="text-xl font-semibold mb-4">🔄 Collect All Payments</h2>
+          <h2 className="text-xl font-semibold mb-4">🔄 Manual Collect All Payments</h2>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
@@ -218,9 +297,10 @@ export default function AdminDashboard() {
           </button>
 
           <div className="mt-4 text-sm text-gray-400">
-            <p>• This will transfer all SOL from user wallets to your wallet</p>
+            <p>• Manual collection to any wallet address you specify</p>
             <p>• Each user wallet contains 0.0009 SOL after payment</p>
             <p>• Transaction fees will be deducted from each transfer</p>
+            <p>• Use auto-transfer above for automatic collection to your main wallet</p>
           </div>
         </div>
 

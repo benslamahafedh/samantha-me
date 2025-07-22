@@ -1,21 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { requireAccess, AccessControlResult } from '@/lib/accessControl';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function POST(req: NextRequest) {
+export const POST = requireAccess(async (req: NextRequest, accessResult: AccessControlResult) => {
   try {
+    console.log('🔊 TTS API Route called with access control');
+    
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: 'OpenAI API key is not configured' }, { status: 500 });
     }
 
-    const { text } = await req.json();
+    // Parse request body to get session ID and text
+    const body = await req.json();
+    const { text, sessionId } = body;
+    
+    // Validate session ID from body matches access control
+    if (sessionId !== accessResult.sessionId) {
+      console.error('❌ Session ID mismatch in TTS');
+      return NextResponse.json({ error: 'Session ID mismatch' }, { status: 403 });
+    }
     
     if (!text || typeof text !== 'string') {
       return NextResponse.json({ error: 'Text is required' }, { status: 400 });
     }
+
+    console.log('🔐 TTS access granted for session:', accessResult.sessionId?.substring(0, 8) + '...');
 
     // Use OpenAI TTS with faster model for speed while maintaining quality
     const mp3 = await openai.audio.speech.create({
@@ -33,6 +46,8 @@ export async function POST(req: NextRequest) {
       headers: {
         'Content-Type': 'audio/mpeg',
         'Content-Length': buffer.length.toString(),
+        'X-Session-ID': accessResult.sessionId || '',
+        'X-Access-Reason': accessResult.reason
       },
     });
 
@@ -52,4 +67,4 @@ export async function POST(req: NextRequest) {
       }, { status: 500 });
     }
   }
-} 
+}); 

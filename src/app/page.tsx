@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import SecureVoiceManager from '@/components/SecureVoiceManager';
+import OptimizedVoiceManager from '@/components/OptimizedVoiceManager';
 import VoiceVisualization from '@/components/VoiceVisualization';
 import CryptoPaymentModal from '@/components/CryptoPaymentModal';
 import WalletProvider from '@/components/WalletProvider';
 import VoiceErrorDisplay from '@/components/VoiceErrorDisplay';
 import SessionTimer from '@/components/SessionTimer';
+import MuteIndicator from '@/components/MuteIndicator';
 
 export default function Home() {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -21,6 +22,7 @@ export default function Home() {
   const [isTrialActive, setIsTrialActive] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
 
   // Initialize session
   useEffect(() => {
@@ -239,6 +241,9 @@ export default function Home() {
     <WalletProvider>
       <main className="relative min-h-screen overflow-hidden select-none touch-none">
         <div className="relative min-h-screen select-none touch-none">
+          {/* Mute Indicator */}
+          <MuteIndicator isMuted={isMuted} />
+          
           {/* Session Timer */}
           <SessionTimer 
             timeLeft={hasWalletAccess ? 3600 : sessionTimeLeft} // Show 1 hour for paid users
@@ -257,6 +262,7 @@ export default function Home() {
             onIntroComplete={handleIntroComplete}
             onStartConversation={handleStartConversation}
             sessionTimeLeft={sessionTimeLeft}
+            isMuted={isMuted}
             sessionEnded={sessionEnded}
           />
 
@@ -269,7 +275,7 @@ export default function Home() {
             />
           )}
 
-          <SecureVoiceManager
+          <OptimizedVoiceManager
             onSpeakingChange={setIsSpeaking}
             onListeningChange={setIsListening}
             onHasStartedChange={handleHasStartedChange}
@@ -280,6 +286,7 @@ export default function Home() {
             onAccessStatusChange={handleAccessStatusChange}
             sessionId={sessionId}
             onVoiceError={setVoiceError}
+            onMuteChange={setIsMuted}
           />
         </div>
 
