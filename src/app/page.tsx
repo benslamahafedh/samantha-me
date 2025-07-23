@@ -4,7 +4,6 @@ import { useState, useCallback, useEffect } from 'react';
 import OptimizedVoiceManager from '@/components/OptimizedVoiceManager';
 import VoiceVisualization from '@/components/VoiceVisualization';
 import CryptoPaymentModal from '@/components/CryptoPaymentModal';
-import WalletProvider from '@/components/WalletProvider';
 import VoiceErrorDisplay from '@/components/VoiceErrorDisplay';
 import SessionTimer from '@/components/SessionTimer';
 import MuteIndicator from '@/components/MuteIndicator';
@@ -28,6 +27,13 @@ export default function Home() {
   useEffect(() => {
     const initializeSession = async () => {
       try {
+        // Initialize server components first
+        try {
+          await fetch('/api/server-init');
+        } catch (initError) {
+          console.log('Server init failed (might already be initialized):', initError);
+        }
+        
         // Try to get existing session from localStorage
         const existingSessionId = localStorage.getItem('samantha_session_id');
         
@@ -238,8 +244,7 @@ export default function Home() {
   }, []);
 
   return (
-    <WalletProvider>
-      <main className="relative min-h-screen overflow-hidden select-none touch-none">
+    <main className="relative min-h-screen overflow-hidden select-none touch-none">
         <div className="relative min-h-screen select-none touch-none">
           {/* Mute Indicator */}
           <MuteIndicator isMuted={isMuted} />
@@ -321,6 +326,5 @@ export default function Home() {
           }}
         />
       </main>
-    </WalletProvider>
   );
 } 

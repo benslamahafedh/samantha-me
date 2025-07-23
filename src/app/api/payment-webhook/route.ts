@@ -2,22 +2,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { SessionManager } from '@/lib/sessionManager';
 import { getAutoTransferManagerInstance } from '@/lib/autoTransferManager';
 
-// Build-safe Solana connection - only initialize at runtime
+// Solana functionality temporarily disabled for build
 let connection: any;
 
-const initializeSolanaConnection = () => {
-  if (typeof window === 'undefined' && !connection) {
-    try {
-      const { Connection } = require('@solana/web3.js');
-      connection = new Connection(
-        process.env.SOLANA_RPC_URL || process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com',
-        'confirmed'
-      );
-    } catch (error) {
-      console.warn('Failed to initialize Solana connection:', error);
-    }
-  }
-};
+// TODO: Re-enable Solana functionality after fixing build issues
+// const initializeSolanaConnection = () => {
+//   if (typeof window === 'undefined' && !connection) {
+//     try {
+//       const { Connection } = require('@solana/web3.js');
+//       connection = new Connection(
+//         process.env.SOLANA_RPC_URL || process.env.HELIUS_RPC_URL || 'https://api.mainnet-beta.solana.com',
+//         'confirmed'
+//       );
+//     } catch (error) {
+//       console.warn('Failed to initialize Solana connection:', error);
+//     }
+//   }
+// };
 
 export async function POST(req: NextRequest) {
   try {

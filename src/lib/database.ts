@@ -1,13 +1,14 @@
 
 
-// Only import Solana libraries on server-side
+// Solana functionality temporarily disabled for build
 let Keypair: any, PublicKey: any;
 
-if (typeof window === 'undefined') {
-  const solanaWeb3 = require('@solana/web3.js');
-  Keypair = solanaWeb3.Keypair;
-  PublicKey = solanaWeb3.PublicKey;
-}
+// TODO: Re-enable Solana functionality after fixing build issues
+// if (typeof window === 'undefined') {
+//   const solanaWeb3 = require('@solana/web3.js');
+//   Keypair = solanaWeb3.Keypair;
+//   PublicKey = solanaWeb3.PublicKey;
+// }
 
 // In-memory database (in production, use PostgreSQL, MongoDB, etc.)
 interface AnonymousUser {
@@ -54,17 +55,8 @@ export class Database {
     const now = new Date();
     const trialExpiresAt = new Date(now.getTime() + trialDurationMinutes * 60 * 1000);
     
-    // Generate unique wallet address for this user
-    let walletAddress: string;
-    
-    if (typeof window === 'undefined' && Keypair) {
-      // Server-side: generate real keypair for address only
-      const keypair = Keypair.generate();
-      walletAddress = keypair.publicKey.toString();
-    } else {
-      // Build-time or client-side: generate mock data
-      walletAddress = `mock_wallet_${sessionId.substring(0, 8)}`;
-    }
+    // Generate unique wallet address for this user (temporarily using mock data)
+    const walletAddress = `mock_wallet_${sessionId.substring(0, 8)}`;
     
     // Generate reference ID for tracking
     const referenceId = this.generateReferenceId(sessionId);

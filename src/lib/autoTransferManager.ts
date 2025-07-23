@@ -1,16 +1,17 @@
-// Only import Solana libraries on server-side
+// Solana functionality temporarily disabled for build
 let Connection: any, PublicKey: any, Keypair: any, LAMPORTS_PER_SOL: any, Transaction: any, SystemProgram: any;
 
-if (typeof window === 'undefined') {
-  // Server-side only imports
-  const solanaWeb3 = require('@solana/web3.js');
-  Connection = solanaWeb3.Connection;
-  PublicKey = solanaWeb3.PublicKey;
-  Keypair = solanaWeb3.Keypair;
-  LAMPORTS_PER_SOL = solanaWeb3.LAMPORTS_PER_SOL;
-  Transaction = solanaWeb3.Transaction;
-  SystemProgram = solanaWeb3.SystemProgram;
-}
+// TODO: Re-enable Solana functionality after fixing build issues
+// if (typeof window === 'undefined') {
+//   // Server-side only imports
+//   const solanaWeb3 = require('@solana/web3.js');
+//   Connection = solanaWeb3.Connection;
+//   PublicKey = solanaWeb3.PublicKey;
+//   Keypair = solanaWeb3.Keypair;
+//   LAMPORTS_PER_SOL = solanaWeb3.LAMPORTS_PER_SOL;
+//   Transaction = solanaWeb3.Transaction;
+//   SystemProgram = solanaWeb3.SystemProgram;
+// }
 
 import { Database } from './database';
 

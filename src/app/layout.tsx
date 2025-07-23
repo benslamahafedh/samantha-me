@@ -1,13 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./mobile-optimizations.css";
+import "@/lib/polyfills";
 import ErrorBoundary from "@/components/ErrorBoundary";
-import WalletProvider from "@/components/WalletProvider";
 
-// Initialize auto-transfer manager on server startup
-if (typeof window === 'undefined') {
-  import('@/lib/serverInit');
-}
+// Server initialization moved to runtime to prevent build issues
 
 // Auto-transfer initialization moved to runtime only
 // No build-time initialization to prevent deployment issues
@@ -61,9 +58,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased" suppressHydrationWarning={true}>
         <ErrorBoundary>
-          <WalletProvider>
-            {children}
-          </WalletProvider>
+          {children}
         </ErrorBoundary>
       </body>
     </html>
