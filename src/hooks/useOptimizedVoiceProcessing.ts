@@ -323,6 +323,9 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
           try {
             const formData = new FormData();
             formData.append('audio', audioBlob, 'recording.webm');
+            if (sessionId) {
+              formData.append('sessionId', sessionId);
+            }
             
             const response = await fetch('/api/transcribe', {
               method: 'POST',
@@ -335,7 +338,7 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
               
               if (transcribedText && isMeaningfulSpeech(transcribedText)) {
                 setTranscript(transcribedText);
-                await processChatOptimized(transcribedText);
+                await processChatOptimized(transcribedText, sessionId);
               }
             }
           } catch (error) {

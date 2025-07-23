@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+
 
 // Only import Solana libraries on server-side
 let Keypair: any, PublicKey: any;
@@ -13,8 +13,6 @@ if (typeof window === 'undefined') {
 interface AnonymousUser {
   sessionId: string;
   walletAddress: string;
-  // SECURITY: Encrypted private key for admin collection only
-  encryptedPrivateKey: string;
   createdAt: Date;
   trialExpiresAt: Date;
   isPaid: boolean;
@@ -38,7 +36,7 @@ if (typeof window === 'undefined' && !global.anonymousUsers) {
 export class Database {
   private static instance: Database;
   private users: Map<string, AnonymousUser>;
-  private readonly ENCRYPTION_KEY = process.env.DATABASE_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+
 
   private constructor() {
     this.users = global.anonymousUsers!;
@@ -56,21 +54,16 @@ export class Database {
     const now = new Date();
     const trialExpiresAt = new Date(now.getTime() + trialDurationMinutes * 60 * 1000);
     
-    // Generate unique Solana keypair for this user (only on server-side)
-    let keypair: any;
+    // Generate unique wallet address for this user
     let walletAddress: string;
-    let encryptedPrivateKey: string;
     
     if (typeof window === 'undefined' && Keypair) {
-      // Server-side: generate real keypair
-      keypair = Keypair.generate();
+      // Server-side: generate real keypair for address only
+      const keypair = Keypair.generate();
       walletAddress = keypair.publicKey.toString();
-      const privateKeyBytes = keypair.secretKey;
-      encryptedPrivateKey = this.encryptPrivateKey(privateKeyBytes);
     } else {
       // Build-time or client-side: generate mock data
       walletAddress = `mock_wallet_${sessionId.substring(0, 8)}`;
-      encryptedPrivateKey = 'mock_encrypted_key';
     }
     
     // Generate reference ID for tracking
@@ -79,7 +72,6 @@ export class Database {
     const user: AnonymousUser = {
       sessionId,
       walletAddress,
-      encryptedPrivateKey,
       createdAt: now,
       trialExpiresAt,
       isPaid: false,
@@ -94,42 +86,7 @@ export class Database {
     return user;
   }
 
-  // SECURITY: Decrypt private key when needed (for admin collection only)
-  async derivePrivateKey(sessionId: string): Promise<string | null> {
-    const user = this.users.get(sessionId);
-    if (!user) return null;
 
-    try {
-      // Decrypt the stored private key
-      const decryptedKey = this.decryptPrivateKey(user.encryptedPrivateKey);
-      return decryptedKey.toString('base64');
-    } catch (error) {
-      console.error('Failed to decrypt private key:', error);
-      return null;
-    }
-  }
-
-  // Encrypt private key for secure storage
-  private encryptPrivateKey(privateKeyBytes: Uint8Array): string {
-    const iv = crypto.randomBytes(16);
-    const key = crypto.scryptSync(this.ENCRYPTION_KEY, 'salt', 32);
-    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
-    let encrypted = cipher.update(privateKeyBytes);
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-    return iv.toString('hex') + ':' + encrypted.toString('hex');
-  }
-
-  // Decrypt private key for admin use
-  private decryptPrivateKey(encryptedKey: string): Buffer {
-    const [ivHex, encryptedHex] = encryptedKey.split(':');
-    const iv = Buffer.from(ivHex, 'hex');
-    const encrypted = Buffer.from(encryptedHex, 'hex');
-    const key = crypto.scryptSync(this.ENCRYPTION_KEY, 'salt', 32);
-    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
-    let decrypted = decipher.update(encrypted);
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted;
-  }
 
   // Get user by session ID
   async getUserBySessionId(sessionId: string): Promise<AnonymousUser | null> {
@@ -206,12 +163,9 @@ export class Database {
     };
   }
 
-  // Get all users (for admin purposes) - SECURITY FIX: Remove sensitive data
-  async getAllUsers(): Promise<Omit<AnonymousUser, 'encryptedPrivateKey'>[]> {
-    return Array.from(this.users.values()).map(user => {
-      const { encryptedPrivateKey, ...safeUser } = user;
-      return safeUser;
-    });
+  // Get all users (for admin purposes)
+  async getAllUsers(): Promise<AnonymousUser[]> {
+    return Array.from(this.users.values());
   }
 
   // Get payment statistics
@@ -235,10 +189,7 @@ export class Database {
       .filter(u => u.isPaid && u.paymentReceivedAt)
       .sort((a, b) => (b.paymentReceivedAt?.getTime() || 0) - (a.paymentReceivedAt?.getTime() || 0))
       .slice(0, 10)
-      .map(user => {
-        const { encryptedPrivateKey, ...safeUser } = user;
-        return safeUser;
-      });
+      .map(user => user);
 
     return {
       totalUsers: users.length,
@@ -273,5 +224,11 @@ export class Database {
     const timestamp = Date.now().toString(36);
     const random = Math.random().toString(36).substring(2, 8);
     return `${sessionId.slice(0, 8)}-${timestamp}-${random}`;
+  }
+
+  // Reset database (for testing/debugging)
+  async resetDatabase(): Promise<void> {
+    this.users.clear();
+    console.log('🗑️ Database reset complete');
   }
 } 

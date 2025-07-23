@@ -119,7 +119,18 @@ export default function VoiceManager({
   // Handle speaking changes
   useEffect(() => {
     onSpeakingChange?.(textToSpeech.isSpeaking);
-  }, [textToSpeech.isSpeaking, onSpeakingChange]);
+    
+    // Update speech recognition TTS active state
+    speechRecognition.setTTSActive(textToSpeech.isSpeaking);
+    
+    // Restart listening when TTS finishes
+    if (!textToSpeech.isSpeaking && hasStarted && !sessionEnded) {
+      console.log('🔄 TTS finished, restarting listening');
+      setTimeout(() => {
+        speechRecognition.startListening();
+      }, 500); // Small delay to ensure TTS is completely finished
+    }
+  }, [textToSpeech.isSpeaking, onSpeakingChange, speechRecognition, hasStarted, sessionEnded]);
 
   // Handle listening changes - SIMPLIFIED
   useEffect(() => {
@@ -158,6 +169,15 @@ export default function VoiceManager({
       });
       return;
     }
+    
+    // Check if this transcript was already processed
+    if (lastProcessedTranscript.current === transcript.trim()) {
+      console.log('🚫 Skipping duplicate transcript:', transcript);
+      return;
+    }
+    
+    // Update last processed transcript
+    lastProcessedTranscript.current = transcript.trim();
     
     console.log('🎙️ Processing user speech:', transcript);
     processingRef.current = true;

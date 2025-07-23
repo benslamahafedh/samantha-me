@@ -95,16 +95,7 @@ const nextConfig: NextConfig = {
     unoptimized: false,
   },
 
-  // SECURITY FIX: Redirects for security
-  async redirects() {
-    return [
-      {
-        source: '/admin',
-        destination: '/admin/',
-        permanent: true,
-      },
-    ];
-  },
+
 
   // SECURITY FIX: Rewrites for API protection
   async rewrites() {

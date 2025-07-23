@@ -4,6 +4,11 @@ import "./mobile-optimizations.css";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import WalletProvider from "@/components/WalletProvider";
 
+// Initialize auto-transfer manager on server startup
+if (typeof window === 'undefined') {
+  import('@/lib/serverInit');
+}
+
 // Auto-transfer initialization moved to runtime only
 // No build-time initialization to prevent deployment issues
 

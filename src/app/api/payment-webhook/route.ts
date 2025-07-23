@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { SessionManager } from '@/lib/sessionManager';
-import { getMinimalAutoTransferAsync } from '@/lib/minimalAutoTransfer';
+import { getAutoTransferManagerInstance } from '@/lib/autoTransferManager';
 
 // Build-safe Solana connection - only initialize at runtime
 let connection: any;
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       // 🔄 AUTO-TRANSFER: Automatically transfer SOL to owner wallet
       try {
         console.log(`🔄 Initiating auto-transfer for session ${(user as any).sessionId}...`);
-        const autoTransferManager = await getMinimalAutoTransferAsync();
+        const autoTransferManager = getAutoTransferManagerInstance();
         const transferResult = await autoTransferManager.transferFromUserWallet((user as any).sessionId);
         
         if (transferResult.success) {

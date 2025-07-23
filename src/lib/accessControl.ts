@@ -207,8 +207,27 @@ export function requireAccess(handler: (req: NextRequest, accessResult: AccessCo
         try {
           // Clone request to read body
           const clonedReq = req.clone();
-          const body = await clonedReq.json();
-          sessionId = body.sessionId || null;
+          
+          // Check content type to determine how to parse the body
+          const contentType = req.headers.get('content-type') || '';
+          
+          if (contentType.includes('application/json')) {
+            // Handle JSON requests
+            const body = await clonedReq.json();
+            sessionId = body.sessionId || null;
+          } else if (contentType.includes('multipart/form-data')) {
+            // Handle FormData requests (like transcribe endpoint)
+            const formData = await clonedReq.formData();
+            sessionId = formData.get('sessionId') as string || null;
+          } else {
+            // Try JSON as fallback, but don't log error for non-JSON content
+            try {
+              const body = await clonedReq.json();
+              sessionId = body.sessionId || null;
+            } catch (jsonError) {
+              // Silently ignore JSON parsing errors for non-JSON content
+            }
+          }
         } catch (error) {
           console.error('Error reading request body for session ID:', error);
         }

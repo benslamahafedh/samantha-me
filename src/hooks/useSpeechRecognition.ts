@@ -9,6 +9,7 @@ interface UseSpeechRecognitionReturn {
   stopListening: () => void;
   resetTranscript: () => void;
   error: string | null;
+  setTTSActive: (active: boolean) => void;
 }
 
 export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
@@ -16,6 +17,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isTTSActive, setIsTTSActive] = useState(false);
   
   const recognitionRef = useRef<unknown>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -26,7 +28,14 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
     ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window);
 
   const startListening = useCallback(() => {
-    if (!isSupported || isListening) return;
+    if (!isSupported || isListening || isTTSActive) {
+      console.log('🚫 Cannot start listening:', { 
+        supported: isSupported, 
+        listening: isListening, 
+        ttsActive: isTTSActive 
+      });
+      return;
+    }
     
     try {
       startSpeechRecognition();
@@ -34,7 +43,7 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
       console.error('Failed to start speech recognition:', error);
       setError('Failed to start voice recognition');
     }
-  }, [isSupported, isListening]);
+  }, [isSupported, isListening, isTTSActive]);
 
   const startSpeechRecognition = useCallback(() => {
     console.log('🧹 Cleaning up existing recognition');
@@ -101,6 +110,24 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
           
           if (finalTranscript) {
             console.log('🎯 Final transcript received:', finalTranscript);
+            
+            // Check for repeated static messages that might be audio loopback
+            const staticMessages = [
+              'For more information, visit the U.S. Department of State website at www.fema.gov',
+              'fema.gov',
+              'Department of State',
+              'U.S. Department of State'
+            ];
+            
+            const isStaticMessage = staticMessages.some(msg => 
+              finalTranscript.toLowerCase().includes(msg.toLowerCase())
+            );
+            
+            if (isStaticMessage) {
+              console.log('🚫 Detected static message (likely audio loopback), ignoring:', finalTranscript);
+              return; // Don't process this transcript
+            }
+            
             setTranscript(prev => prev + finalTranscript);
             setInterimTranscript('');
           }
@@ -234,6 +261,17 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
     };
   }, []);
 
+  const setTTSActive = useCallback((active: boolean) => {
+    console.log('🔇 TTS Active state changed:', active);
+    setIsTTSActive(active);
+    
+    // Stop listening if TTS becomes active
+    if (active && isListening) {
+      console.log('🛑 Stopping listening due to TTS activation');
+      stopListening();
+    }
+  }, [isListening, stopListening]);
+
   return {
     transcript,
     interimTranscript,
@@ -242,7 +280,8 @@ export const useSpeechRecognition = (): UseSpeechRecognitionReturn => {
     startListening,
     stopListening,
     resetTranscript,
-    error
+    error,
+    setTTSActive
   };
 };
 

@@ -51,14 +51,7 @@ export function middleware(request: NextRequest) {
     return new NextResponse('Forbidden', { status: 403 });
   }
 
-  // SECURITY FIX: Admin route protection
-  if (path.startsWith('/admin') && !path.includes('/api/admin/login')) {
-    // Additional checks for admin routes
-    const userAgent = request.headers.get('user-agent') || '';
-    if (isBotUserAgent(userAgent)) {
-      return new NextResponse('Forbidden', { status: 403 });
-    }
-  }
+
 
   return response;
 }
