@@ -22,6 +22,96 @@ export default function Home() {
   const [sessionId, setSessionId] = useState<string>('');
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
+  const [audioInitialized, setAudioInitialized] = useState(false);
+
+  // iOS detection and audio initialization
+  useEffect(() => {
+    // Only run on client side
+    if (typeof window === 'undefined') return;
+    
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    setIsIOS(isIOSDevice);
+    
+    if (isIOSDevice) {
+      console.log('🍎 iOS device detected - initializing audio session');
+      console.log('📱 User Agent:', navigator.userAgent);
+      
+      // Initialize iOS audio session
+      const initializeIOSAudio = async () => {
+        try {
+          console.log('🔧 Starting iOS audio initialization...');
+          
+          // Create audio context to activate audio session
+          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+          if (AudioContextClass) {
+            console.log('✅ AudioContext available');
+            const audioContext = new AudioContextClass();
+            console.log('📊 Audio context state:', audioContext.state);
+            
+            // Configure audio session for iOS
+            if ((audioContext as any).setAudioSessionConfiguration) {
+              console.log('🔧 Configuring iOS audio session...');
+              await (audioContext as any).setAudioSessionConfiguration({
+                category: 'playAndRecord',
+                mode: 'voiceChat',
+                options: ['defaultToSpeaker', 'allowBluetooth', 'allowBluetoothA2DP']
+              });
+              console.log('✅ iOS audio session configured');
+            } else {
+              console.log('⚠️ setAudioSessionConfiguration not available');
+            }
+            
+            // Resume audio context if suspended
+            if (audioContext.state === 'suspended') {
+              console.log('🔄 Resuming suspended audio context...');
+              await audioContext.resume();
+              console.log('✅ iOS audio context resumed');
+            }
+            
+            // Create a silent oscillator to activate audio session
+            console.log('🔊 Creating silent oscillator to activate audio session...');
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.001);
+            
+            setAudioInitialized(true);
+            console.log('✅ iOS audio session activated successfully');
+          } else {
+            console.error('❌ AudioContext not available');
+            setVoiceError('Audio not supported on this device');
+          }
+        } catch (error) {
+          console.error('❌ iOS audio initialization failed:', error);
+          setVoiceError(`Audio initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      };
+      
+      // Initialize audio on user interaction
+      const handleUserInteraction = () => {
+        console.log('👆 User interaction detected - initializing audio...');
+        initializeIOSAudio();
+        document.removeEventListener('touchstart', handleUserInteraction);
+        document.removeEventListener('click', handleUserInteraction);
+      };
+      
+      document.addEventListener('touchstart', handleUserInteraction);
+      document.addEventListener('click', handleUserInteraction);
+      
+      // Also try to initialize on page load
+      console.log('🚀 Attempting initial audio initialization...');
+      initializeIOSAudio();
+    } else {
+      console.log('🖥️ Non-iOS device detected');
+      setAudioInitialized(true);
+    }
+  }, []);
 
   // Initialize session
   useEffect(() => {
@@ -60,7 +150,10 @@ export default function Home() {
       }
     };
     
-    initializeSession();
+    // Only initialize session after audio is ready on iOS
+    if (!isIOS || audioInitialized) {
+      initializeSession();
+    }
 
     // Listen for session initialization from payment modal
     const handleSessionInitialized = (event: CustomEvent) => {
@@ -73,7 +166,7 @@ export default function Home() {
     return () => {
       window.removeEventListener('sessionInitialized', handleSessionInitialized as EventListener);
     };
-  }, []);
+  }, [isIOS, audioInitialized]);
 
   // Mobile-specific fixes to prevent interference with voice interaction
   useEffect(() => {
@@ -242,6 +335,21 @@ export default function Home() {
     setHasWalletAccess(hasAccess);
     setIsTrialActive(trialActive);
   }, []);
+
+  // Show loading state for iOS while audio initializes
+  if (isIOS && !audioInitialized) {
+    return (
+      <main className="relative min-h-screen overflow-hidden select-none touch-none">
+        <div className="relative min-h-screen select-none touch-none flex items-center justify-center">
+          <div className="text-center text-white">
+            <div className="animate-pulse text-2xl mb-4">🍎</div>
+            <div className="text-lg mb-2">Initializing audio...</div>
+            <div className="text-sm text-gray-400">Tap anywhere to continue</div>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="relative min-h-screen overflow-hidden select-none touch-none">

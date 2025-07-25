@@ -122,11 +122,7 @@ export default function VoiceVisualization({
   const isActive = isHovering || isTouching;
 
   // Check if user is on iOS
-  const isIOS = typeof window !== 'undefined' && (
-    navigator.userAgent.includes('iPhone') || 
-    navigator.userAgent.includes('iPad') || 
-    navigator.userAgent.includes('iPod')
-  );
+  const isIOS = typeof window !== 'undefined' && typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
 
   // Show iOS audio instructions
   const [showIOSInstructions, setShowIOSInstructions] = useState(false);
@@ -141,9 +137,26 @@ export default function VoiceVisualization({
       return () => clearTimeout(timer);
     }
   }, [isIOS, isReady, hasStarted]);
+  const needsIOSAudioActivation = isIOS && !hasStarted && isReady;
 
   return (
     <div className="flex flex-col items-center justify-center h-screen w-screen overflow-hidden p-4 sm:p-8 gradient-rose-pink">
+      {/* iOS Audio Activation Overlay */}
+      {needsIOSAudioActivation && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="text-center text-white p-6 max-w-sm">
+            <div className="text-4xl mb-4 animate-pulse">🍎</div>
+            <h3 className="text-xl font-medium mb-2">iOS Audio Setup</h3>
+            <p className="text-sm text-gray-300 mb-4">
+              Tap anywhere to activate audio and start your conversation with Samantha
+            </p>
+            <div className="text-xs text-gray-400">
+              This is required for iOS devices to enable microphone access
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="relative flex flex-col items-center max-w-2xl w-full">
         
         {/* Enhanced Magical Intro - AI Consciousness Awakening */}

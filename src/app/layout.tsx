@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./mobile-optimizations.css";
 import "@/lib/polyfills";
@@ -10,12 +10,11 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 // No build-time initialization to prevent deployment issues
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://samantha-voice-assistant.vercel.app'),
   title: "Samantha - Voice Assistant",
   description: "A beautiful voice-only assistant Powered by OMNIAOS. Speak naturally to begin an intimate conversation.",
   keywords: ["voice assistant", "AI", "conversation", "Her", "Samantha"],
   authors: [{ name: "Voice Assistant" }],
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
-  themeColor: "#f43f5e",
   manifest: "/manifest.json",
   // iOS-specific meta tags for audio
   other: {
@@ -47,6 +46,15 @@ export const metadata: Metadata = {
     description: "A beautiful voice-only assistant Powered by OMNIAOS",
     images: ["/og-image.png"]
   }
+};
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+  themeColor: '#f43f5e'
 };
 
 export default function RootLayout({
