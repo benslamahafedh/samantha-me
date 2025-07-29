@@ -1,40 +1,20 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { Database } from '@/lib/database';
+import { NextResponse } from 'next/server';
 
-let isInitialized = false;
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    if (!isInitialized) {
-      console.log('🚀 Initializing server components...');
-      
-      // Initialize database
-      const database = Database.getInstance();
-      console.log('✅ Database initialized');
-      
-      // Test the database
-      const stats = await database.getUsageStats();
-      console.log('📊 Usage stats:', stats);
-      
-      isInitialized = true;
-      
-      return NextResponse.json({
-        success: true,
-        message: 'Server initialized successfully',
-        stats
-      });
-    } else {
-      return NextResponse.json({
-        success: true,
-        message: 'Server already initialized'
-      });
-    }
+    console.log('🚀 Server initialization check');
     
+    // Simple health check
+    return NextResponse.json({
+      success: true,
+      message: 'Server is ready',
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
-    console.error('❌ Failed to initialize server:', error);
+    console.error('Server init error:', error);
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Unknown initialization error'
+      error: 'Server initialization failed'
     }, { status: 500 });
   }
 } 

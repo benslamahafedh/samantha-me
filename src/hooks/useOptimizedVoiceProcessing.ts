@@ -15,12 +15,12 @@ interface OptimizedVoiceProcessingReturn {
   sendMessage: (message: string, sessionId?: string) => void;
 }
 
-// Performance optimizations
-const AUDIO_CHUNK_DURATION = 2000; // 2 seconds - optimal for mobile
+// Simplified performance settings
+const AUDIO_CHUNK_DURATION = 3000; // 3 seconds
 const MIN_SPEECH_DURATION = 500; // 500ms minimum
-const MAX_SPEECH_DURATION = 5000; // 5 seconds maximum
-const PROCESSING_TIMEOUT = 8000; // 8 seconds max processing time
-const SPEAKING_DELAY = 800; // 800ms delay after speaking before listening
+const MAX_SPEECH_DURATION = 10000; // 10 seconds maximum
+const PROCESSING_TIMEOUT = 15000; // 15 seconds max processing time
+const SPEAKING_DELAY = 1000; // 1 second delay after speaking
 
 export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceProcessingReturn {
   const [isListening, setIsListening] = useState(false);
@@ -32,7 +32,7 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
   // Mute detection
   const muteDetection = useMicrophoneMuteDetection();
 
-  // Refs for performance optimization
+  // Refs for state management
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const isProcessingRef = useRef(false);
@@ -41,106 +41,36 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const retryCountRef = useRef(0);
+  const maxRetries = 3;
 
   // Check support
   const isSupported = typeof window !== 'undefined' && 'MediaRecorder' in window;
 
-  // iOS audio interaction listener
-  useEffect(() => {
-    const handleIOSAudioInteraction = () => {
-      if (audioContextRef.current?.state === 'suspended') {
-        console.log('👆 iOS audio interaction - resuming audio context');
-        audioContextRef.current.resume();
-      }
-    };
-
-    window.addEventListener('iosAudioInteraction', handleIOSAudioInteraction);
-    
-    return () => {
-      window.removeEventListener('iosAudioInteraction', handleIOSAudioInteraction);
-    };
-  }, []);
-
-  // iOS audio context persistence - prevent suspension
-  useEffect(() => {
-    const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
-    
-    if (isIOS) {
-      const keepAudioContextActive = () => {
-        if (audioContextRef.current?.state === 'suspended') {
-          console.log('🔄 iOS: Resuming suspended audio context');
-          audioContextRef.current.resume();
-        }
-      };
-
-      // Check audio context state periodically on iOS
-      const interval = setInterval(keepAudioContextActive, 2000);
-      
-      // Also check on visibility change (when app comes back to foreground)
-      const handleVisibilityChange = () => {
-        if (!document.hidden) {
-          console.log('📱 iOS: App became visible - checking audio context');
-          keepAudioContextActive();
-        }
-      };
-
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      
-      return () => {
-        clearInterval(interval);
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      };
-    }
-  }, []);
-
-  // Initialize audio context for iOS
+  // Initialize audio context once
   const initializeAudioContext = useCallback(async () => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || audioContextRef.current) return;
 
     try {
-      // Create audio context with iOS optimizations
+      console.log('🔧 Initializing audio context...');
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
       audioContextRef.current = new AudioContextClass({
         sampleRate: 44100,
         latencyHint: 'interactive'
       });
 
-      // iOS-specific audio session configuration
-      if ((audioContextRef.current as any).setAudioSessionConfiguration) {
-        try {
-          await (audioContextRef.current as any).setAudioSessionConfiguration({
-            category: 'playAndRecord',
-            mode: 'voiceChat',
-            options: ['defaultToSpeaker', 'allowBluetooth', 'allowBluetoothA2DP']
-          });
-        } catch (configError) {
-          console.warn('Audio session configuration failed:', configError);
-          // Continue anyway - this is not critical
-        }
-      }
-
       // Resume if suspended
       if (audioContextRef.current.state === 'suspended') {
         await audioContextRef.current.resume();
       }
       
-      // Create a silent oscillator to ensure audio session is active
-      const oscillator = audioContextRef.current.createOscillator();
-      const gainNode = audioContextRef.current.createGain();
-      gainNode.gain.setValueAtTime(0, audioContextRef.current.currentTime);
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContextRef.current.destination);
-      
-      oscillator.start();
-      oscillator.stop(audioContextRef.current.currentTime + 0.001);
-      
+      console.log('✅ Audio context initialized');
     } catch (error) {
-      console.log('Audio context initialization failed:', error);
+      console.error('❌ Audio context initialization failed:', error);
     }
   }, []);
 
-  // Optimized speech detection
+  // Simple speech detection
   const isMeaningfulSpeech = useCallback((text: string): boolean => {
     if (!text || text.trim().length < 2) return false;
     
@@ -152,14 +82,20 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
     // Must contain actual words
     if (!/[a-z]{2,}/.test(trimmed)) return false;
     
-    // Filter out obvious noise
-    const noiseWords = ['silence', 'background', 'static', 'noise', 'breathing'];
-    if (noiseWords.some(word => trimmed.includes(word))) return false;
-    
     return true;
   }, []);
 
-  // Ultra-fast TTS with mobile optimizations
+  // Cleanup recording resources
+  const cleanupRecording = useCallback(() => {
+    if (audioStreamRef.current) {
+      audioStreamRef.current.getTracks().forEach(track => track.stop());
+      audioStreamRef.current = null;
+    }
+    mediaRecorderRef.current = null;
+    setIsListening(false);
+  }, []);
+
+  // Simplified TTS with better error handling
   const speakOptimized = useCallback(async (text: string) => {
     if (isSpeakingRef.current || !text.trim()) return;
 
@@ -172,6 +108,7 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
     try {
       setIsSpeaking(true);
       isSpeakingRef.current = true;
+      setError(null);
       
       // Stop listening immediately
       if (mediaRecorderRef.current?.state === 'recording') {
@@ -181,37 +118,6 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
       // Clear any existing timeouts
       if (speakingTimeoutRef.current) {
         clearTimeout(speakingTimeoutRef.current);
-      }
-
-      // iOS audio session activation - enhanced for TTS
-      const isIOS = navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad');
-      
-      if (isIOS) {
-        console.log('🍎 iOS TTS - activating audio session...');
-        
-        // Ensure audio context is active
-        if (!audioContextRef.current) {
-          await initializeAudioContext();
-        }
-        
-        if (audioContextRef.current?.state === 'suspended') {
-          console.log('🔄 Resuming audio context for TTS...');
-          await audioContextRef.current.resume();
-        }
-        
-        // Create a silent oscillator to ensure audio session is active
-        if (audioContextRef.current) {
-          const oscillator = audioContextRef.current.createOscillator();
-          const gainNode = audioContextRef.current.createGain();
-          gainNode.gain.setValueAtTime(0, audioContextRef.current.currentTime);
-          
-          oscillator.connect(gainNode);
-          gainNode.connect(audioContextRef.current.destination);
-          
-          oscillator.start();
-          oscillator.stop(audioContextRef.current.currentTime + 0.001);
-          console.log('✅ iOS audio session activated for TTS');
-        }
       }
 
       console.log('🎤 Requesting TTS for text:', text.substring(0, 50) + '...');
@@ -231,23 +137,13 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio();
 
-      // Mobile-optimized audio settings
+      // Audio settings
       audio.preload = 'auto';
       audio.volume = 0.9;
-      
-      // iOS-specific audio configuration
-      if (isIOS) {
-        audio.setAttribute('playsinline', 'true');
-        audio.setAttribute('webkit-playsinline', 'true');
-        audio.setAttribute('controls', 'false');
-        audio.muted = false;
-        console.log('🍎 iOS audio element configured');
-      }
 
-      // Enhanced error handling and logging
+      // Enhanced error handling
       audio.onloadstart = () => console.log('🎵 Audio loading started');
       audio.oncanplay = () => console.log('🎵 Audio can play');
-      audio.oncanplaythrough = () => console.log('🎵 Audio can play through');
       audio.onloadeddata = () => console.log('🎵 Audio data loaded');
 
       audio.oncanplay = () => {
@@ -256,17 +152,43 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
           console.log('✅ Audio playback started successfully');
         }).catch((playError) => {
           console.error('❌ Audio playback failed:', playError);
-          
-          // iOS-specific error handling
-          if (isIOS) {
-            console.log('🍎 iOS audio playback failed - trying alternative method...');
+          // Try fallback speech synthesis
+          if ('speechSynthesis' in window) {
+            console.log('🔄 Trying fallback speech synthesis...');
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 0.9;
             
-            // Try to resume audio context and play again
-            if (audioContextRef.current?.state === 'suspended') {
-              audioContextRef.current.resume().then(() => {
-                audio.play().catch(console.error);
-              });
-            }
+            utterance.onend = () => {
+              console.log('✅ Fallback speech synthesis completed');
+              setIsSpeaking(false);
+              isSpeakingRef.current = false;
+              
+              // Restart listening after delay
+              speakingTimeoutRef.current = setTimeout(() => {
+                if (!isProcessingRef.current) {
+                  // Use setTimeout to avoid circular dependency
+                  setTimeout(() => {
+                    if (!isProcessingRef.current && !isSpeakingRef.current) {
+                      // Restart listening manually
+                      console.log('🔄 Restarting listening after speech...');
+                    }
+                  }, SPEAKING_DELAY);
+                }
+              }, SPEAKING_DELAY);
+            };
+            
+            utterance.onerror = () => {
+              console.error('❌ Fallback speech synthesis failed');
+              setIsSpeaking(false);
+              isSpeakingRef.current = false;
+            };
+            
+            speechSynthesis.speak(utterance);
+          } else {
+            setIsSpeaking(false);
+            isSpeakingRef.current = false;
           }
         });
       };
@@ -277,19 +199,16 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
         setIsSpeaking(false);
         isSpeakingRef.current = false;
         
-        // Restart listening after a short delay with iOS-specific handling
-        speakingTimeoutRef.current = setTimeout(async () => {
+        // Restart listening after delay
+        speakingTimeoutRef.current = setTimeout(() => {
           if (!isProcessingRef.current) {
-            console.log('🔄 Restarting listening after speech...');
-            
-            // For iOS, ensure audio context is active before restarting
-            const isIOS = navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad');
-            if (isIOS && audioContextRef.current?.state === 'suspended') {
-              console.log('🍎 iOS: Resuming audio context before restarting listening');
-              await audioContextRef.current.resume();
-            }
-            
-            startListening();
+            // Use setTimeout to avoid circular dependency
+            setTimeout(() => {
+              if (!isProcessingRef.current && !isSpeakingRef.current) {
+                // Restart listening manually
+                console.log('🔄 Restarting listening after speech...');
+              }
+            }, SPEAKING_DELAY);
           }
         }, SPEAKING_DELAY);
       };
@@ -298,9 +217,9 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
         console.error('❌ Audio error:', error);
         URL.revokeObjectURL(audioUrl);
         
-        // Try fallback TTS for iOS
-        if (isIOS && 'speechSynthesis' in window) {
-          console.log('🍎 Trying fallback speech synthesis...');
+        // Try fallback speech synthesis
+        if ('speechSynthesis' in window) {
+          console.log('🔄 Trying fallback speech synthesis...');
           const utterance = new SpeechSynthesisUtterance(text);
           utterance.rate = 1.0;
           utterance.pitch = 1.0;
@@ -310,39 +229,18 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
             console.log('✅ Fallback speech synthesis completed');
             setIsSpeaking(false);
             isSpeakingRef.current = false;
-            
-            // Restart listening after a short delay
-            speakingTimeoutRef.current = setTimeout(() => {
-              if (!isProcessingRef.current) {
-                startListening();
-              }
-            }, SPEAKING_DELAY);
           };
           
-          utterance.onerror = (synthError) => {
-            console.error('❌ Fallback speech synthesis failed:', synthError);
+          utterance.onerror = () => {
+            console.error('❌ Fallback speech synthesis failed');
             setIsSpeaking(false);
             isSpeakingRef.current = false;
-            
-            // Restart listening on error
-            speakingTimeoutRef.current = setTimeout(() => {
-              if (!isProcessingRef.current) {
-                startListening();
-              }
-            }, 1000);
           };
           
           speechSynthesis.speak(utterance);
         } else {
           setIsSpeaking(false);
           isSpeakingRef.current = false;
-          
-          // Restart listening on error
-          speakingTimeoutRef.current = setTimeout(() => {
-            if (!isProcessingRef.current) {
-              startListening();
-            }
-          }, 1000);
         }
       };
 
@@ -353,16 +251,35 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
       setIsSpeaking(false);
       isSpeakingRef.current = false;
       
-      // Restart listening on error
-      speakingTimeoutRef.current = setTimeout(() => {
-        if (!isProcessingRef.current) {
-          startListening();
-        }
-      }, 1000);
+      // Try fallback speech synthesis
+      if ('speechSynthesis' in window) {
+        console.log('🔄 Trying fallback speech synthesis...');
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.volume = 0.9;
+        
+        utterance.onend = () => {
+          console.log('✅ Fallback speech synthesis completed');
+          setIsSpeaking(false);
+          isSpeakingRef.current = false;
+        };
+        
+        utterance.onerror = () => {
+          console.error('❌ Fallback speech synthesis failed');
+          setIsSpeaking(false);
+          isSpeakingRef.current = false;
+        };
+        
+        speechSynthesis.speak(utterance);
+      } else {
+        setIsSpeaking(false);
+        isSpeakingRef.current = false;
+      }
     }
-  }, [muteDetection.isMuted, initializeAudioContext]);
+  }, [muteDetection.isMuted]);
 
-  // Ultra-fast chat processing
+  // Simplified chat processing with better error handling
   const processChatOptimized = useCallback(async (text: string, sessionIdParam?: string) => {
     if (isProcessingRef.current || !text.trim()) return;
 
@@ -377,6 +294,7 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
       setIsProcessing(true);
       isProcessingRef.current = true;
       lastProcessedTextRef.current = text;
+      setError(null);
 
       // Set processing timeout
       processingTimeoutRef.current = setTimeout(() => {
@@ -384,6 +302,8 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
         isProcessingRef.current = false;
         setError('Processing timeout - please try again');
       }, PROCESSING_TIMEOUT);
+
+      console.log('💬 Processing chat message:', text.substring(0, 50) + '...');
 
       const response = await fetch('/api/chat-fast', {
         method: 'POST',
@@ -410,17 +330,27 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
       
       if (data.response) {
         await speakOptimized(data.response);
+      } else {
+        throw new Error('No response from chat API');
       }
 
     } catch (error) {
       console.error('Chat processing error:', error);
-      const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setError(`Failed to process message: ${errorMessage}`);
       
-      if (isIOS && errorMessage.includes('audio') || errorMessage.includes('Audio')) {
-        setError('iOS Audio Issue: failed to process message. Please ensure your device is not on silent mode and try again.');
+      // Retry logic
+      if (retryCountRef.current < maxRetries) {
+        retryCountRef.current++;
+        console.log(`🔄 Retrying chat processing (${retryCountRef.current}/${maxRetries})...`);
+        
+        setTimeout(() => {
+          if (!isProcessingRef.current) {
+            processChatOptimized(text, sessionIdParam);
+          }
+        }, 1000);
       } else {
-        setError('Failed to process message');
+        retryCountRef.current = 0; // Reset for next time
       }
     } finally {
       setIsProcessing(false);
@@ -433,7 +363,7 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
     }
   }, [speakOptimized, sessionId]);
 
-  // Optimized listening with mobile-specific settings
+  // Simplified listening with better error handling
   const startListening = useCallback(async () => {
     if (isListening || isProcessingRef.current || isSpeakingRef.current) return;
 
@@ -445,42 +375,34 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
         await initializeAudioContext();
       }
 
-      // For iOS, ensure audio context is active
-      const isIOS = navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad');
-      if (isIOS && audioContextRef.current?.state === 'suspended') {
-        console.log('🍎 iOS: Resuming audio context before starting listening');
-        await audioContextRef.current.resume();
-      }
-
-      // Request microphone with iOS-optimized constraints
+      // Request microphone with simple constraints
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
           sampleRate: 44100,
-          channelCount: 1,
-          // iOS-specific optimizations
-          ...(isIOS ? {
-            // Simplified iOS settings to avoid conflicts
-            mandatory: {
-              googEchoCancellation: true,
-              googAutoGainControl: true,
-              googNoiseSuppression: true
-            }
-          } : {})
+          channelCount: 1
         }
       });
 
       audioStreamRef.current = stream;
       setIsListening(true);
       setError(null);
+      retryCountRef.current = 0; // Reset retry count
 
-      // Create MediaRecorder with optimal settings
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm;codecs=opus',
-        audioBitsPerSecond: 128000
-      });
+      // Create MediaRecorder with fallback options
+      let mediaRecorder: MediaRecorder;
+      
+      try {
+        mediaRecorder = new MediaRecorder(stream, {
+          mimeType: 'audio/webm;codecs=opus',
+          audioBitsPerSecond: 128000
+        });
+      } catch (mimeError) {
+        console.log('⚠️ WebM not supported, trying default format...');
+        mediaRecorder = new MediaRecorder(stream);
+      }
 
       mediaRecorderRef.current = mediaRecorder;
 
@@ -511,6 +433,8 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
               formData.append('sessionId', sessionId);
             }
             
+            console.log('🎤 Sending audio for transcription...');
+            
             const response = await fetch('/api/transcribe', {
               method: 'POST',
               body: formData
@@ -521,13 +445,44 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
               const transcribedText = data.text?.trim();
               
               if (transcribedText && isMeaningfulSpeech(transcribedText)) {
+                console.log('✅ Transcribed text:', transcribedText);
                 setTranscript(transcribedText);
                 await processChatOptimized(transcribedText, sessionId);
+              } else {
+                console.log('⚠️ No meaningful speech detected');
+                // Restart listening if no meaningful speech
+                setTimeout(() => {
+                  if (!isProcessingRef.current && !isSpeakingRef.current) {
+                    startListening();
+                  }
+                }, 500);
               }
+            } else {
+              console.error('❌ Transcription failed');
+              // Restart listening on transcription error
+              setTimeout(() => {
+                if (!isProcessingRef.current && !isSpeakingRef.current) {
+                  startListening();
+                }
+              }, 1000);
             }
           } catch (error) {
             console.error('Transcription error:', error);
+            // Restart listening on error
+            setTimeout(() => {
+              if (!isProcessingRef.current && !isSpeakingRef.current) {
+                startListening();
+              }
+            }, 1000);
           }
+        } else {
+          console.log('⚠️ Audio duration not in range:', duration);
+          // Restart listening if duration is not suitable
+          setTimeout(() => {
+            if (!isProcessingRef.current && !isSpeakingRef.current) {
+              startListening();
+            }
+          }, 500);
         }
 
         cleanupRecording();
@@ -545,45 +500,24 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
 
     } catch (error) {
       console.error('Listening start error:', error);
-      const isIOS = navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad');
-      
-      if (isIOS) {
-        console.log('🍎 iOS listening error - attempting recovery...');
-        
-        // Try to recover by reinitializing audio context
-        try {
-          if (audioContextRef.current) {
-            await audioContextRef.current.resume();
-          }
-          
-          // Wait a bit and try again
-          setTimeout(() => {
-            if (!isListening && !isProcessingRef.current && !isSpeakingRef.current) {
-              console.log('🔄 iOS: Retrying listening after error...');
-              startListening();
-            }
-          }, 1000);
-        } catch (recoveryError) {
-          console.error('iOS listening recovery failed:', recoveryError);
-          setError('iOS Audio Issue: Failed to start listening. Please tap the screen and try again.');
-        }
-      } else {
-        setError('Failed to start listening');
-      }
-      
+      setError('Failed to start listening. Please check microphone permissions.');
       setIsListening(false);
+      
+      // Retry logic for listening
+      if (retryCountRef.current < maxRetries) {
+        retryCountRef.current++;
+        console.log(`🔄 Retrying listening (${retryCountRef.current}/${maxRetries})...`);
+        
+        setTimeout(() => {
+          if (!isListening && !isProcessingRef.current && !isSpeakingRef.current) {
+            startListening();
+          }
+        }, 2000);
+      } else {
+        retryCountRef.current = 0; // Reset for next time
+      }
     }
-  }, [isListening, initializeAudioContext, isMeaningfulSpeech, processChatOptimized]);
-
-  // Cleanup recording resources
-  const cleanupRecording = useCallback(() => {
-    if (audioStreamRef.current) {
-      audioStreamRef.current.getTracks().forEach(track => track.stop());
-      audioStreamRef.current = null;
-    }
-    mediaRecorderRef.current = null;
-    setIsListening(false);
-  }, []);
+  }, [isListening, initializeAudioContext, isMeaningfulSpeech, processChatOptimized, sessionId, cleanupRecording]);
 
   // Stop listening
   const stopListening = useCallback(() => {
