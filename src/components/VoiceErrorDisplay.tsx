@@ -48,6 +48,8 @@ export default function VoiceErrorDisplay({
                 <li>• Go to Settings → Safari → Microphone → Allow</li>
                 <li>• Try refreshing the page</li>
                 <li>• Check that media volume is turned up</li>
+                <li>• Tap the screen to retry audio initialization</li>
+                <li>• Close Safari completely and reopen</li>
               </ul>
             </div>
           )}
@@ -68,6 +70,15 @@ export default function VoiceErrorDisplay({
                 className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
               >
                 Allow Microphone
+              </button>
+            )}
+            
+            {isIOS && (
+              <button
+                onClick={onRetry}
+                className="flex-1 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
+              >
+                Retry iOS Audio
               </button>
             )}
             

@@ -38,61 +38,91 @@ export default function Home() {
       console.log('📱 User Agent:', navigator.userAgent);
       console.log('🔧 Dev Mode:', devMode);
       
-      // Initialize iOS audio session
+      // Initialize iOS audio session with enhanced error handling
       const initializeIOSAudio = async () => {
         try {
-          console.log('🔧 Starting iOS audio initialization...');
+          console.log('🔧 Starting enhanced iOS audio initialization...');
           
-          // Create audio context to activate audio session
+          // Step 1: Create audio context to activate audio session
           const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-          if (AudioContextClass) {
-            console.log('✅ AudioContext available');
-            const audioContext = new AudioContextClass();
-            console.log('📊 Audio context state:', audioContext.state);
-            
-            // Configure audio session for iOS
-            if ((audioContext as any).setAudioSessionConfiguration) {
-              console.log('🔧 Configuring iOS audio session...');
+          if (!AudioContextClass) {
+            throw new Error('AudioContext not supported on this device');
+          }
+          
+          console.log('✅ AudioContext available');
+          const audioContext = new AudioContextClass({
+            sampleRate: 44100,
+            latencyHint: 'interactive'
+          });
+          console.log('📊 Audio context state:', audioContext.state);
+          
+          // Step 2: Configure iOS audio session if available
+          if ((audioContext as any).setAudioSessionConfiguration) {
+            console.log('🔧 Configuring iOS audio session...');
+            try {
               await (audioContext as any).setAudioSessionConfiguration({
                 category: 'playAndRecord',
                 mode: 'voiceChat',
                 options: ['defaultToSpeaker', 'allowBluetooth', 'allowBluetoothA2DP']
               });
               console.log('✅ iOS audio session configured');
-            } else {
-              console.log('⚠️ setAudioSessionConfiguration not available');
+            } catch (configError) {
+              console.warn('⚠️ Audio session configuration failed:', configError);
+              // Continue anyway - this is not critical
             }
-            
-            // Resume audio context if suspended
-            if (audioContext.state === 'suspended') {
-              console.log('🔄 Resuming suspended audio context...');
-              await audioContext.resume();
-              console.log('✅ iOS audio context resumed');
-            }
-            
-            // Create a silent oscillator to activate audio session
-            console.log('🔊 Creating silent oscillator to activate audio session...');
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.start();
-            oscillator.stop(audioContext.currentTime + 0.001);
-            
-            setAudioInitialized(true);
-            setIsLoading(false);
-            console.log('✅ iOS audio session activated successfully');
           } else {
-            console.error('❌ AudioContext not available');
-            setAudioError('Audio not supported on this device');
-            setIsLoading(false);
+            console.log('⚠️ setAudioSessionConfiguration not available');
           }
+          
+          // Step 3: Resume audio context if suspended
+          if (audioContext.state === 'suspended') {
+            console.log('🔄 Resuming suspended audio context...');
+            await audioContext.resume();
+            console.log('✅ iOS audio context resumed');
+          }
+          
+          // Step 4: Create a silent oscillator to activate audio session
+          console.log('🔊 Creating silent oscillator to activate audio session...');
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+          gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+          
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+          
+          oscillator.start();
+          oscillator.stop(audioContext.currentTime + 0.001);
+          
+          // Step 5: Test microphone access
+          console.log('🎤 Testing microphone access...');
+          try {
+            const testStream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                sampleRate: 44100,
+                channelCount: 1
+              }
+            });
+            
+            // Stop the test stream immediately
+            testStream.getTracks().forEach(track => track.stop());
+            console.log('✅ Microphone access test successful');
+          } catch (micError) {
+            console.warn('⚠️ Microphone access test failed:', micError);
+            // Don't fail completely - user might grant permission later
+          }
+          
+          setAudioInitialized(true);
+          setIsLoading(false);
+          setAudioError(null);
+          console.log('✅ iOS audio session activated successfully');
+          
         } catch (error) {
           console.error('❌ iOS audio initialization failed:', error);
-          setAudioError(`Audio initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          setAudioError(`Audio initialization failed: ${errorMessage}. Please tap the screen to retry.`);
           setIsLoading(false);
         }
       };
@@ -101,11 +131,13 @@ export default function Home() {
       const handleUserInteraction = () => {
         console.log('👆 User interaction detected - initializing audio...');
         setAudioError(null);
+        setIsLoading(true);
         initializeIOSAudio();
         document.removeEventListener('touchstart', handleUserInteraction);
         document.removeEventListener('click', handleUserInteraction);
       };
       
+      // Add event listeners for user interaction
       document.addEventListener('touchstart', handleUserInteraction);
       document.addEventListener('click', handleUserInteraction);
       
@@ -113,16 +145,20 @@ export default function Home() {
       console.log('🚀 Attempting initial audio initialization...');
       initializeIOSAudio();
       
-      // Fallback: if audio doesn't initialize within 5 seconds, show error
+      // Fallback: if audio doesn't initialize within 8 seconds, show error
       const fallbackTimer = setTimeout(() => {
         if (!audioInitialized && !audioError) {
           console.log('⏰ Audio initialization timeout - showing fallback');
           setAudioError('Audio initialization timeout. Please tap the screen to retry.');
           setIsLoading(false);
         }
-      }, 5000);
+      }, 8000);
       
-      return () => clearTimeout(fallbackTimer);
+      return () => {
+        clearTimeout(fallbackTimer);
+        document.removeEventListener('touchstart', handleUserInteraction);
+        document.removeEventListener('click', handleUserInteraction);
+      };
     } else {
       console.log('🖥️ Non-iOS device detected');
       setAudioInitialized(true);
@@ -179,15 +215,15 @@ export default function Home() {
     };
   }, [isIOS, audioInitialized]);
 
-  // iOS fallback: if audio fails to initialize after 10 seconds, proceed anyway
+  // iOS fallback: if audio fails to initialize after 15 seconds, proceed anyway
   useEffect(() => {
     if (isIOS && !audioInitialized && !audioError) {
       const fallbackTimer = setTimeout(() => {
         console.log('⏰ iOS audio initialization timeout - proceeding with fallback');
         setAudioInitialized(true);
         setIsLoading(false);
-        setAudioError('Audio initialization incomplete. Some features may not work properly.');
-      }, 10000);
+        setAudioError('Audio initialization incomplete. Some features may not work properly. Please try tapping the screen to retry.');
+      }, 15000);
       
       return () => clearTimeout(fallbackTimer);
     }
@@ -288,6 +324,31 @@ export default function Home() {
     const event = new Event('startConversation');
     window.dispatchEvent(event);
   }, []);
+
+  // iOS audio interaction handler - dispatch event for voice processing
+  const handleIOSAudioInteraction = useCallback(() => {
+    if (isIOS) {
+      console.log('👆 iOS user interaction - triggering audio activation');
+      const event = new CustomEvent('iosAudioInteraction');
+      window.dispatchEvent(event);
+    }
+  }, [isIOS]);
+
+  // Add iOS audio interaction listeners
+  useEffect(() => {
+    if (isIOS) {
+      const events = ['touchstart', 'click', 'touchend'];
+      events.forEach(event => {
+        document.addEventListener(event, handleIOSAudioInteraction, { once: true });
+      });
+      
+      return () => {
+        events.forEach(event => {
+          document.removeEventListener(event, handleIOSAudioInteraction);
+        });
+      };
+    }
+  }, [isIOS, handleIOSAudioInteraction]);
 
   // Show loading state for iOS while audio initializes
   if (isLoading) {
