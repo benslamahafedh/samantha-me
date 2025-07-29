@@ -1,14 +1,6 @@
 
 
-// Solana functionality temporarily disabled for build
-let Keypair: any, PublicKey: any;
-
-// TODO: Re-enable Solana functionality after fixing build issues
-// if (typeof window === 'undefined') {
-//   const solanaWeb3 = require('@solana/web3.js');
-//   Keypair = solanaWeb3.Keypair;
-//   PublicKey = solanaWeb3.PublicKey;
-// }
+// In-memory database (in production, use PostgreSQL, MongoDB, etc.)
 
 // In-memory database (in production, use PostgreSQL, MongoDB, etc.)
 interface AnonymousUser {
