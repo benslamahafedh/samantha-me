@@ -61,6 +61,38 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
     };
   }, []);
 
+  // iOS audio context persistence - prevent suspension
+  useEffect(() => {
+    const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+    
+    if (isIOS) {
+      const keepAudioContextActive = () => {
+        if (audioContextRef.current?.state === 'suspended') {
+          console.log('🔄 iOS: Resuming suspended audio context');
+          audioContextRef.current.resume();
+        }
+      };
+
+      // Check audio context state periodically on iOS
+      const interval = setInterval(keepAudioContextActive, 2000);
+      
+      // Also check on visibility change (when app comes back to foreground)
+      const handleVisibilityChange = () => {
+        if (!document.hidden) {
+          console.log('📱 iOS: App became visible - checking audio context');
+          keepAudioContextActive();
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      
+      return () => {
+        clearInterval(interval);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
+  }, []);
+
   // Initialize audio context for iOS
   const initializeAudioContext = useCallback(async () => {
     if (typeof window === 'undefined') return;
@@ -245,9 +277,18 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
         setIsSpeaking(false);
         isSpeakingRef.current = false;
         
-        // Restart listening after a short delay
-        speakingTimeoutRef.current = setTimeout(() => {
+        // Restart listening after a short delay with iOS-specific handling
+        speakingTimeoutRef.current = setTimeout(async () => {
           if (!isProcessingRef.current) {
+            console.log('🔄 Restarting listening after speech...');
+            
+            // For iOS, ensure audio context is active before restarting
+            const isIOS = navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad');
+            if (isIOS && audioContextRef.current?.state === 'suspended') {
+              console.log('🍎 iOS: Resuming audio context before restarting listening');
+              await audioContextRef.current.resume();
+            }
+            
             startListening();
           }
         }, SPEAKING_DELAY);
@@ -397,14 +438,21 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
     if (isListening || isProcessingRef.current || isSpeakingRef.current) return;
 
     try {
+      console.log('🎤 Starting listening...');
+      
       // Initialize audio context if needed
       if (!audioContextRef.current) {
         await initializeAudioContext();
       }
 
-      // Request microphone with iOS-optimized constraints
+      // For iOS, ensure audio context is active
       const isIOS = navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad');
-      
+      if (isIOS && audioContextRef.current?.state === 'suspended') {
+        console.log('🍎 iOS: Resuming audio context before starting listening');
+        await audioContextRef.current.resume();
+      }
+
+      // Request microphone with iOS-optimized constraints
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -497,7 +545,32 @@ export function useOptimizedVoiceProcessing(sessionId?: string): OptimizedVoiceP
 
     } catch (error) {
       console.error('Listening start error:', error);
-      setError('Failed to start listening');
+      const isIOS = navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad');
+      
+      if (isIOS) {
+        console.log('🍎 iOS listening error - attempting recovery...');
+        
+        // Try to recover by reinitializing audio context
+        try {
+          if (audioContextRef.current) {
+            await audioContextRef.current.resume();
+          }
+          
+          // Wait a bit and try again
+          setTimeout(() => {
+            if (!isListening && !isProcessingRef.current && !isSpeakingRef.current) {
+              console.log('🔄 iOS: Retrying listening after error...');
+              startListening();
+            }
+          }, 1000);
+        } catch (recoveryError) {
+          console.error('iOS listening recovery failed:', recoveryError);
+          setError('iOS Audio Issue: Failed to start listening. Please tap the screen and try again.');
+        }
+      } else {
+        setError('Failed to start listening');
+      }
+      
       setIsListening(false);
     }
   }, [isListening, initializeAudioContext, isMeaningfulSpeech, processChatOptimized]);

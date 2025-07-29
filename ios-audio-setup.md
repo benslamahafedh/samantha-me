@@ -360,6 +360,184 @@ console.log('❌ Audio playback failed');
 
 ---
 
+## 🔄 iOS Issue - "Samantha Stops Responding After First Greeting"
+
+### **Problem Description**
+Samantha gives her first greeting but then **stops responding** to subsequent messages. The speaking animation works but she doesn't process or respond to your voice input.
+
+### **Root Causes**
+1. **Audio Context Suspension**: iOS suspends the audio context after the first interaction
+2. **Microphone Stream Closure**: The microphone stream gets closed after TTS playback
+3. **Session State Issues**: Audio session not properly maintained between interactions
+4. **Background App Suspension**: iOS backgrounding affects audio context state
+5. **Visibility Change Issues**: App visibility changes suspend audio context
+
+### **Immediate Solutions**
+
+#### **1. Manual Restart (Quick Fix)**
+- **Use the Restart Button**: Look for the orange "🔄 Restart" button in the bottom-right corner
+- **Tap the button** when Samantha stops responding
+- **Wait for the conversation to restart** and try speaking again
+
+#### **2. Device Settings**
+- **Keep Safari Active**: Don't switch to other apps while using Samantha
+- **Turn off Silent Mode**: Ensure the mute switch is off
+- **Check Volume**: Make sure media volume is turned up
+
+#### **3. App Interaction**
+- **Tap the screen** periodically to keep audio context active
+- **Stay on the page** - don't navigate away and back
+- **Refresh the page** if restart button doesn't work
+
+### **Enhanced Audio Context Management**
+
+The app now includes improved iOS audio context persistence:
+
+#### **Step-by-Step Audio Context Recovery**
+1. **Periodic State Check**: Monitors audio context state every 2 seconds
+2. **Automatic Resume**: Automatically resumes suspended audio context
+3. **Visibility Change Handling**: Resumes audio when app becomes visible
+4. **User Interaction Detection**: Resumes audio on touch/click events
+5. **Error Recovery**: Attempts to recover from audio context failures
+
+#### **Audio Context Persistence Features**
+- **Continuous Monitoring**: Checks audio context state every 2 seconds on iOS
+- **Automatic Recovery**: Resumes suspended audio context automatically
+- **Visibility Handling**: Resumes audio when app comes back to foreground
+- **User Interaction Triggers**: Resumes audio on any user interaction
+- **Error Retry Logic**: Multiple retry attempts for failed audio operations
+
+### **Debugging Session Issues**
+
+#### **Console Logs to Watch For**
+```
+🔄 iOS: Resuming suspended audio context
+📱 iOS: App became visible - checking audio context
+🎤 Starting listening...
+🍎 iOS: Resuming audio context before starting listening
+🔄 Restarting listening after speech...
+🍎 iOS: Resuming audio context before restarting listening
+🍎 iOS listening error - attempting recovery...
+🔄 iOS: Retrying listening after error...
+```
+
+#### **Common Session Error Patterns**
+- `Audio context suspended`: iOS suspended the audio context
+- `Microphone stream closed`: Microphone access was lost
+- `Listening start error`: Failed to start listening after speech
+- `Audio context recovery failed`: Could not resume audio context
+
+### **Testing Session Recovery**
+
+#### **Development Mode**
+Add `?dev=ios` to the URL or set localStorage flag:
+```javascript
+localStorage.setItem('samantha_dev_ios', 'true');
+```
+
+#### **Session Testing Checklist**
+- [ ] First greeting plays correctly
+- [ ] Microphone activates after greeting
+- [ ] Voice input is processed
+- [ ] Samantha responds to voice input
+- [ ] Conversation continues after first exchange
+- [ ] Restart button appears when needed
+
+### **Advanced Session Troubleshooting**
+
+#### **If Samantha Still Stops Responding**
+1. **Use Restart Button**: Click the orange restart button
+2. **Check Console Logs**: Look for audio context suspension messages
+3. **Tap Screen**: Tap the screen to trigger audio context resume
+4. **Refresh Page**: Reload the page and try again
+5. **Restart Safari**: Close Safari completely and reopen
+
+#### **Developer Testing**
+```bash
+# Monitor audio context state changes
+# Check for suspension/resume cycles
+# Test visibility change handling
+# Verify restart button functionality
+```
+
+### **Session Performance Optimizations**
+
+#### **iOS-Specific Session Settings**
+- **Audio Context Persistence**: Continuous monitoring and recovery
+- **Stream Management**: Better microphone stream handling
+- **State Recovery**: Automatic recovery from suspended states
+- **User Interaction**: Enhanced interaction detection
+
+#### **Mobile Session Optimizations**
+- **Periodic Checks**: Audio context state monitoring
+- **Automatic Recovery**: Self-healing audio context
+- **Error Retry**: Multiple retry attempts
+- **Manual Override**: User-triggered restart mechanism
+
+### **Browser Compatibility**
+
+#### **Session Support by Browser**
+- ✅ **Safari** (iOS): Full session persistence with recovery
+- ⚠️ **Chrome** (iOS): Limited session recovery
+- ⚠️ **Firefox** (iOS): Limited session recovery
+- ❌ **Other browsers**: May not work
+
+#### **iOS Version Requirements**
+- **iOS 14+**: Full audio context persistence support
+- **iOS 13**: Limited session recovery
+- **iOS 12 and below**: Not supported
+
+### **Session Error Recovery**
+
+#### **Automatic Recovery**
+The app includes multiple session recovery mechanisms:
+1. **Audio Context Monitoring**: Continuous state checking
+2. **Automatic Resume**: Resumes suspended audio context
+3. **Visibility Handling**: Resumes audio when app becomes visible
+4. **Error Retry**: Multiple retry attempts for failed operations
+
+#### **Manual Recovery Steps**
+1. **Use Restart Button**: Click the orange restart button
+2. **Tap Screen**: Tap anywhere on the screen
+3. **Refresh Page**: Reload the page
+4. **Close Safari**: Close Safari completely and reopen
+5. **Restart Device**: Power cycle your iPhone
+
+### **Monitoring and Logging**
+
+#### **Key Session Metrics to Monitor**
+- Audio context suspension frequency
+- Session recovery success rate
+- Restart button usage
+- Error recovery attempts
+- User interaction frequency
+
+#### **Session Log Analysis**
+```javascript
+// Look for these patterns in console logs
+console.log('🔄 iOS: Resuming suspended audio context');
+console.log('📱 iOS: App became visible - checking audio context');
+console.log('🎤 Starting listening...');
+console.log('🔄 iOS: Retrying listening after error...');
+console.log('🔄 iOS: Manual restart triggered');
+```
+
+### **Future Session Improvements**
+
+#### **Planned Enhancements**
+- **Progressive Session Recovery**: Gradual audio context restoration
+- **Adaptive Session Management**: Dynamic recovery based on device capability
+- **Offline Session Support**: Basic functionality without network
+- **Session Diagnostics**: Built-in session testing tools
+
+#### **User Experience**
+- **Better Session Error Messages**: More specific troubleshooting guidance
+- **Visual Session Feedback**: Session status indicators
+- **Auto-Retry Session**: Automatic retry on recoverable errors
+- **Graceful Session Degradation**: Fallback to text-only mode
+
+---
+
 ## 🚀 Quick Start for Testing
 
 1. **Open Safari** on your iPhone

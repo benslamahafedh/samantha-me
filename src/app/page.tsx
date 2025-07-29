@@ -450,6 +450,24 @@ export default function Home() {
             />
           )}
 
+          {/* iOS Restart Button - when conversation is active but not responding */}
+          {isIOS && hasStarted && !isListening && !isSpeaking && !sessionEnded && (
+            <div className="fixed bottom-4 right-4 z-50">
+              <button
+                onClick={() => {
+                  console.log('🔄 iOS: Manual restart triggered');
+                  setVoiceError(null);
+                  // Trigger a conversation restart
+                  window.dispatchEvent(new Event('startConversation'));
+                }}
+                className="bg-orange-500 text-white px-4 py-2 rounded-full shadow-lg hover:bg-orange-600 transition-colors text-sm font-medium"
+                title="Restart conversation if Samantha stops responding"
+              >
+                🔄 Restart
+              </button>
+            </div>
+          )}
+
           <OptimizedVoiceManager
             onSpeakingChange={setIsSpeaking}
             onListeningChange={setIsListening}
