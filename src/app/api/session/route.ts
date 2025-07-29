@@ -49,13 +49,10 @@ export async function POST(req: NextRequest) {
       accessExpiresAt: accessResult.accessExpiresAt,
       user: {
         sessionId: (result.user as any).sessionId,
-        walletAddress: (result.user as any).walletAddress,
-        referenceId: (result.user as any).referenceId,
-        isPaid: (result.user as any).isPaid,
-        amountReceived: (result.user as any).amountReceived,
+        dailyUsageMinutes: (result.user as any).dailyUsageMinutes,
+        lastUsageDate: (result.user as any).lastUsageDate,
         createdAt: (result.user as any).createdAt,
-        trialExpiresAt: (result.user as any).trialExpiresAt,
-        accessExpiresAt: (result.user as any).accessExpiresAt
+        trialExpiresAt: (result.user as any).trialExpiresAt
       }
     });
 
@@ -114,9 +111,8 @@ export async function GET(req: NextRequest) {
       accessExpiresAt: accessResult.accessExpiresAt,
       user: accessResult.user ? {
         sessionId: (accessResult.user as any).sessionId,
-        walletAddress: (accessResult.user as any).walletAddress,
-        referenceId: (accessResult.user as any).referenceId,
-        isPaid: (accessResult.user as any).isPaid,
+        dailyUsageMinutes: (accessResult.user as any).dailyUsageMinutes,
+        lastUsageDate: (accessResult.user as any).lastUsageDate,
         createdAt: (accessResult.user as any).createdAt
       } : null
     });

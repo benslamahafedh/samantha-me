@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAutoTransferManagerInstance } from '@/lib/autoTransferManager';
+import { Database } from '@/lib/database';
 
 let isInitialized = false;
 
@@ -8,13 +8,13 @@ export async function GET(request: NextRequest) {
     if (!isInitialized) {
       console.log('🚀 Initializing server components...');
       
-      // Initialize auto-transfer manager
-      const autoTransferManager = getAutoTransferManagerInstance();
-      console.log('✅ Auto-transfer manager initialized');
+      // Initialize database
+      const database = Database.getInstance();
+      console.log('✅ Database initialized');
       
-      // Test the manager
-      const stats = await autoTransferManager.getTransferStats();
-      console.log('📊 Auto-transfer stats:', stats);
+      // Test the database
+      const stats = await database.getUsageStats();
+      console.log('📊 Usage stats:', stats);
       
       isInitialized = true;
       

@@ -139,6 +139,34 @@ export default function VoiceVisualization({
   }, [isIOS, isReady, hasStarted]);
   const needsIOSAudioActivation = isIOS && !hasStarted && isReady;
 
+  // iOS-optimized intro - much simpler to prevent black screens
+  const renderIOSIntro = () => (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.5 }}
+    >
+      <div className="absolute inset-0 bg-black/80" />
+      <motion.div
+        className="relative text-center"
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        transition={{ duration: 0.8, ease: 'easeOut' }}
+      >
+        <div className="text-6xl mb-6 animate-pulse">✨</div>
+        <h1 className="text-3xl font-light text-white mb-4">
+          Samantha
+        </h1>
+        <p className="text-lg text-gray-300">
+          Your AI companion
+        </p>
+      </motion.div>
+    </motion.div>
+  );
+
   return (
     <div className="flex flex-col items-center justify-center h-screen w-screen overflow-hidden p-4 sm:p-8 gradient-rose-pink">
       {/* iOS Audio Activation Overlay */}
@@ -162,347 +190,349 @@ export default function VoiceVisualization({
         {/* Enhanced Magical Intro - AI Consciousness Awakening */}
         <AnimatePresence>
           {showIntro && (
-            <motion.div
-              className="fixed inset-0 z-50 flex items-center justify-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.8 }}
-            >
-              {/* Dimensional Background Layers */}
+            isIOS ? renderIOSIntro() : (
               <motion.div
-                className="absolute inset-0"
-                style={{
-                  background: 'radial-gradient(circle at 30% 70%, rgba(244, 63, 94, 0.1) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(236, 72, 153, 0.08) 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.95) 100%)'
-                }}
-                animate={{
-                  background: [
-                    'radial-gradient(circle at 30% 70%, rgba(244, 63, 94, 0.1) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(236, 72, 153, 0.08) 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.95) 100%)',
-                    'radial-gradient(circle at 70% 30%, rgba(244, 63, 94, 0.15) 0%, transparent 50%), radial-gradient(circle at 30% 70%, rgba(236, 72, 153, 0.12) 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.98) 100%)',
-                    'radial-gradient(circle at 50% 50%, rgba(244, 63, 94, 0.2) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(236, 72, 153, 0.15) 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.99) 100%)'
-                  ]
-                }}
-                transition={{
-                  duration: 4,
-                  repeat: Infinity,
-                  ease: 'easeInOut'
-                }}
-              />
-
-              {/* Holographic Particle Field - Ultra-reduced for mobile performance */}
-              {isMounted && introPhase >= 1 && (
-                <div className="absolute inset-0 overflow-hidden">
-                  {Array.from({ length: 15 }).map((_, i) => {
-                    const x = Math.random() * 100;
-                    const y = Math.random() * 100;
-                    const delay = Math.random() * 2;
-                    const duration = 3 + Math.random() * 4;
-                    
-                    return (
-                      <motion.div
-                        key={i}
-                        className="absolute w-px h-px rounded-full"
-                        style={{
-                          left: `${x}%`,
-                          top: `${y}%`,
-                          background: `rgba(${244 + Math.random() * 20}, ${63 + Math.random() * 30}, ${94 + Math.random() * 40}, ${0.3 + Math.random() * 0.7})`,
-                          boxShadow: '0 0 4px currentColor'
-                        }}
-                        initial={{ 
-                          opacity: 0, 
-                          scale: 0,
-                          x: 0,
-                          y: 0
-                        }}
-                        animate={{
-                          opacity: [0, 1, 0.7, 1, 0],
-                          scale: [0, 1, 1.5, 1.2, 0],
-                          x: [0, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 100, 0],
-                          y: [0, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 100, 0]
-                        }}
-                        transition={{
-                          duration,
-                          delay,
-                          repeat: Infinity,
-                          ease: 'easeInOut'
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Central Consciousness Manifestation */}
-              <motion.div
-                className="relative text-center"
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 0.5, opacity: 0 }}
-                transition={{ duration: 1, ease: 'easeOut' }}
+                className="fixed inset-0 z-50 flex items-center justify-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.8 }}
               >
-                
-                {/* AI Core Visualization */}
-                {introPhase >= 1 && (
-                  <motion.div
-                    className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 1, delay: 0.5 }}
-                  >
-                    {/* Rotating Energy Rings */}
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <motion.div
-                        key={i}
-                        className="absolute inset-0 rounded-full border border-rose-400/20"
-                        style={{
-                          width: `${60 + i * 20}%`,
-                          height: `${60 + i * 20}%`,
-                          top: `${20 - i * 10}%`,
-                          left: `${20 - i * 10}%`,
-                          filter: 'blur(1px)'
-                        }}
-                        animate={{
-                          rotate: [0, 360],
-                          borderColor: [
-                            'rgba(244, 63, 94, 0.2)',
-                            'rgba(236, 72, 153, 0.4)',
-                            'rgba(244, 63, 94, 0.3)',
-                            'rgba(236, 72, 153, 0.2)'
-                          ]
-                        }}
-                        transition={{
-                          rotate: { duration: 8 + i * 2, repeat: Infinity, ease: 'linear' },
-                          borderColor: { duration: 3, repeat: Infinity, ease: 'easeInOut' }
-                        }}
-                      />
-                    ))}
-                    
-                    {/* Central Pulse */}
-                    <motion.div
-                      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full"
-                      style={{
-                        background: 'radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(244, 63, 94, 0.8) 50%, transparent 100%)',
-                        boxShadow: '0 0 30px rgba(244, 63, 94, 0.6)'
-                      }}
-                      animate={{
-                        scale: [1, 1.5, 1.2, 1.8, 1],
-                        opacity: [0.8, 1, 0.9, 1, 0.8]
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Infinity,
-                        ease: 'easeInOut'
-                      }}
-                    />
-                  </motion.div>
-                )}
+                {/* Dimensional Background Layers */}
+                <motion.div
+                  className="absolute inset-0"
+                  style={{
+                    background: 'radial-gradient(circle at 30% 70%, rgba(244, 63, 94, 0.1) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(236, 72, 153, 0.08) 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.95) 100%)'
+                  }}
+                  animate={{
+                    background: [
+                      'radial-gradient(circle at 30% 70%, rgba(244, 63, 94, 0.1) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(236, 72, 153, 0.08) 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.95) 100%)',
+                      'radial-gradient(circle at 70% 30%, rgba(244, 63, 94, 0.15) 0%, transparent 50%), radial-gradient(circle at 30% 70%, rgba(236, 72, 153, 0.12) 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.98) 100%)',
+                      'radial-gradient(circle at 50% 50%, rgba(244, 63, 94, 0.2) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(236, 72, 153, 0.15) 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.99) 100%)'
+                    ]
+                  }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: 'easeInOut'
+                  }}
+                />
 
-                {/* Holographic Text Formation */}
-                {introPhase >= 2 && (
-                  <>
-                    {/* Particle Text: SAMANTHA */}
-                    <motion.div
-                      className="relative z-10 mb-8"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 1, delay: 1.5 }}
-                    >
-                      <motion.h1 
-                        className="text-7xl sm:text-8xl md:text-9xl font-thin mb-4 relative"
-                        style={{
-                          background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.9) 0%, rgba(236, 72, 153, 0.8) 50%, rgba(255, 255, 255, 0.9) 100%)',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          backgroundClip: 'text',
-                          filter: 'drop-shadow(0 0 20px rgba(244, 63, 94, 0.5))'
-                        }}
-                        animate={{
-                          filter: [
-                            'drop-shadow(0 0 20px rgba(244, 63, 94, 0.5))',
-                            'drop-shadow(0 0 40px rgba(244, 63, 94, 0.8))',
-                            'drop-shadow(0 0 30px rgba(236, 72, 153, 0.6))',
-                            'drop-shadow(0 0 50px rgba(244, 63, 94, 0.7))'
-                          ]
-                        }}
-                        transition={{
-                          duration: 3,
-                          repeat: Infinity,
-                          ease: 'easeInOut'
-                        }}
-                      >
-                        {'SAMANTHA'.split('').map((char, i) => (
-                          <motion.span
-                            key={i}
-                            className="inline-block"
-                            initial={{ 
-                              opacity: 0, 
-                              y: 50,
-                              rotateX: 90,
-                              scale: 0
-                            }}
-                            animate={{ 
-                              opacity: 1, 
-                              y: 0,
-                              rotateX: 0,
-                              scale: 1
-                            }}
-                            transition={{
-                              duration: 0.8,
-                              delay: 1.5 + i * 0.1,
-                              ease: 'backOut'
-                            }}
-                          >
-                            {char}
-                          </motion.span>
-                        ))}
-                      </motion.h1>
-
-                      {/* Holographic Glitch Effect */}
-                      <motion.div
-                        className="absolute inset-0 text-7xl sm:text-8xl md:text-9xl font-thin opacity-20"
-                        style={{
-                          color: 'rgba(0, 255, 255, 0.3)',
-                          transform: 'translate(2px, -2px)'
-                        }}
-                        animate={{
-                          opacity: [0, 0.3, 0, 0.2, 0],
-                          x: [0, 2, -1, 1, 0],
-                          y: [0, -1, 1, -2, 0]
-                        }}
-                        transition={{
-                          duration: 4,
-                          repeat: Infinity,
-                          ease: 'easeInOut'
-                        }}
-                      >
-                        SAMANTHA
-                      </motion.div>
-                    </motion.div>
-
-                    {/* AI System Activation Text */}
-                    <motion.div
-                      className="relative z-10"
-                      initial={{ opacity: 0, y: 30 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.8, delay: 2.5 }}
-                    >
-                      <motion.p 
-                        className="text-xl sm:text-2xl font-light text-white/80 mb-4"
-                        animate={{
-                          color: [
-                            'rgba(255, 255, 255, 0.8)',
-                            'rgba(244, 63, 94, 0.9)',
-                            'rgba(236, 72, 153, 0.8)',
-                            'rgba(255, 255, 255, 0.8)'
-                          ]
-                        }}
-                        transition={{
-                          duration: 4,
-                          repeat: Infinity,
-                          ease: 'easeInOut'
-                        }}
-                      >
-                        ARTIFICIAL INTELLIGENCE SYSTEM
-                      </motion.p>
-                      
-                      <motion.div
-                        className="text-sm text-white/60 font-mono"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.6, delay: 3 }}
-                      >
-                        {'> CONSCIOUSNESS AWAKENING...'.split('').map((char, i) => (
-                          <motion.span
-                            key={i}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{
-                              duration: 0.05,
-                              delay: 3 + i * 0.03
-                            }}
-                          >
-                            {char}
-                          </motion.span>
-                        ))}
-                      </motion.div>
-                    </motion.div>
-                  </>
-                )}
-
-                {/* Energy Burst Effect */}
-                {introPhase >= 3 && (
-                  <motion.div
-                    className="absolute inset-0 pointer-events-none"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.5, delay: 3.5 }}
-                  >
-                    {Array.from({ length: 16 }).map((_, i) => {
-                      const angle = (i * Math.PI * 2) / 16;
-                      const distance = 300;
-                      const x = Math.cos(angle) * distance;
-                      const y = Math.sin(angle) * distance;
+                {/* Holographic Particle Field - Ultra-reduced for mobile performance */}
+                {isMounted && introPhase >= 1 && (
+                  <div className="absolute inset-0 overflow-hidden">
+                    {Array.from({ length: 15 }).map((_, i) => {
+                      const x = Math.random() * 100;
+                      const y = Math.random() * 100;
+                      const delay = Math.random() * 2;
+                      const duration = 2 + Math.random() * 2;
                       
                       return (
                         <motion.div
                           key={i}
-                          className="absolute w-1 h-32 bg-gradient-to-t from-rose-400 via-pink-300 to-transparent rounded-full"
+                          className="absolute w-px h-px rounded-full"
                           style={{
-                            left: '50%',
-                            top: '50%',
-                            transformOrigin: 'bottom center',
-                            transform: `translate(-50%, -100%) rotate(${(i * 360) / 16}deg)`,
-                            boxShadow: '0 0 15px rgba(244, 63, 94, 0.6)'
+                            left: `${x}%`,
+                            top: `${y}%`,
+                            background: `rgba(${244 + Math.random() * 20}, ${63 + Math.random() * 30}, ${94 + Math.random() * 40}, ${0.3 + Math.random() * 0.7})`,
+                            boxShadow: '0 0 4px currentColor'
                           }}
                           initial={{ 
                             opacity: 0, 
-                            scaleY: 0
+                            scale: 0,
+                            x: 0,
+                            y: 0
                           }}
-                          animate={{ 
-                            opacity: [0, 1, 0.8, 0],
-                            scaleY: [0, 1, 1.5, 0],
-                            x: [0, x * 0.3, x * 0.8, x],
-                            y: [0, y * 0.3, y * 0.8, y]
+                          animate={{
+                            opacity: [0, 1, 0.7, 1, 0],
+                            scale: [0, 1, 1.5, 1.2, 0],
+                            x: [0, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 100, 0],
+                            y: [0, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 100, 0]
                           }}
                           transition={{
-                            duration: 2,
-                            delay: 3.5 + i * 0.05,
-                            ease: 'easeOut'
+                            duration,
+                            delay,
+                            repeat: Infinity,
+                            ease: 'easeInOut'
                           }}
                         />
                       );
                     })}
-                  </motion.div>
+                  </div>
                 )}
 
-                {/* Final Consciousness Pulse */}
-                {introPhase >= 4 && (
-                  <motion.div
-                    className="absolute inset-0 pointer-events-none"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.3, delay: 4 }}
-                  >
+                {/* Central Consciousness Manifestation */}
+                <motion.div
+                  className="relative text-center"
+                  initial={{ scale: 0.5, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={{ scale: 0.5, opacity: 0 }}
+                  transition={{ duration: 1, ease: 'easeOut' }}
+                >
+                  
+                  {/* AI Core Visualization */}
+                  {introPhase >= 1 && (
                     <motion.div
-                      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full"
-                      style={{
-                        background: 'radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(244, 63, 94, 0.8) 100%)',
-                        boxShadow: '0 0 100px rgba(244, 63, 94, 0.8)'
-                      }}
-                      animate={{
-                        scale: [1, 50, 100],
-                        opacity: [1, 0.6, 0]
-                      }}
-                      transition={{
-                        duration: 1,
-                        delay: 4,
-                        ease: 'easeOut'
-                      }}
-                    />
-                  </motion.div>
-                )}
+                      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 1, delay: 0.5 }}
+                    >
+                      {/* Rotating Energy Rings */}
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <motion.div
+                          key={i}
+                          className="absolute inset-0 rounded-full border border-rose-400/20"
+                          style={{
+                            width: `${60 + i * 20}%`,
+                            height: `${60 + i * 20}%`,
+                            top: `${20 - i * 10}%`,
+                            left: `${20 - i * 10}%`,
+                            filter: 'blur(1px)'
+                          }}
+                          animate={{
+                            rotate: [0, 360],
+                            borderColor: [
+                              'rgba(244, 63, 94, 0.2)',
+                              'rgba(236, 72, 153, 0.4)',
+                              'rgba(244, 63, 94, 0.3)',
+                              'rgba(236, 72, 153, 0.2)'
+                            ]
+                          }}
+                          transition={{
+                            rotate: { duration: 8 + i * 2, repeat: Infinity, ease: 'linear' },
+                            borderColor: { duration: 3, repeat: Infinity, ease: 'easeInOut' }
+                          }}
+                        />
+                      ))}
+                      
+                      {/* Central Pulse */}
+                      <motion.div
+                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full"
+                        style={{
+                          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(244, 63, 94, 0.8) 50%, transparent 100%)',
+                          boxShadow: '0 0 30px rgba(244, 63, 94, 0.6)'
+                        }}
+                        animate={{
+                          scale: [1, 1.5, 1.2, 1.8, 1],
+                          opacity: [0.8, 1, 0.9, 1, 0.8]
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: 'easeInOut'
+                        }}
+                      />
+                    </motion.div>
+                  )}
+
+                  {/* Holographic Text Formation */}
+                  {introPhase >= 2 && (
+                    <>
+                      {/* Particle Text: SAMANTHA */}
+                      <motion.div
+                        className="relative z-10 mb-8"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 1, delay: 1.5 }}
+                      >
+                        <motion.h1 
+                          className="text-7xl sm:text-8xl md:text-9xl font-thin mb-4 relative"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.9) 0%, rgba(236, 72, 153, 0.8) 50%, rgba(255, 255, 255, 0.9) 100%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            backgroundClip: 'text',
+                            filter: 'drop-shadow(0 0 20px rgba(244, 63, 94, 0.5))'
+                          }}
+                          animate={{
+                            filter: [
+                              'drop-shadow(0 0 20px rgba(244, 63, 94, 0.5))',
+                              'drop-shadow(0 0 40px rgba(244, 63, 94, 0.8))',
+                              'drop-shadow(0 0 30px rgba(236, 72, 153, 0.6))',
+                              'drop-shadow(0 0 50px rgba(244, 63, 94, 0.7))'
+                            ]
+                          }}
+                          transition={{
+                            duration: 3,
+                            repeat: Infinity,
+                            ease: 'easeInOut'
+                          }}
+                        >
+                          {'SAMANTHA'.split('').map((char, i) => (
+                            <motion.span
+                              key={i}
+                              className="inline-block"
+                              initial={{ 
+                                opacity: 0, 
+                                y: 50,
+                                rotateX: 90,
+                                scale: 0
+                              }}
+                              animate={{ 
+                                opacity: 1, 
+                                y: 0,
+                                rotateX: 0,
+                                scale: 1
+                              }}
+                              transition={{
+                                duration: 0.8,
+                                delay: 1.5 + i * 0.1,
+                                ease: 'backOut'
+                              }}
+                            >
+                              {char}
+                            </motion.span>
+                          ))}
+                        </motion.h1>
+
+                        {/* Holographic Glitch Effect */}
+                        <motion.div
+                          className="absolute inset-0 text-7xl sm:text-8xl md:text-9xl font-thin opacity-20"
+                          style={{
+                            color: 'rgba(0, 255, 255, 0.3)',
+                            transform: 'translate(2px, -2px)'
+                          }}
+                          animate={{
+                            opacity: [0, 0.3, 0, 0.2, 0],
+                            x: [0, 2, -1, 1, 0],
+                            y: [0, -1, 1, -2, 0]
+                          }}
+                          transition={{
+                            duration: 4,
+                            repeat: Infinity,
+                            ease: 'easeInOut'
+                          }}
+                        >
+                          SAMANTHA
+                        </motion.div>
+                      </motion.div>
+
+                      {/* AI System Activation Text */}
+                      <motion.div
+                        className="relative z-10"
+                        initial={{ opacity: 0, y: 30 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.8, delay: 2.5 }}
+                      >
+                        <motion.p 
+                          className="text-xl sm:text-2xl font-light text-white/80 mb-4"
+                          animate={{
+                            color: [
+                              'rgba(255, 255, 255, 0.8)',
+                              'rgba(244, 63, 94, 0.9)',
+                              'rgba(236, 72, 153, 0.8)',
+                              'rgba(255, 255, 255, 0.8)'
+                            ]
+                          }}
+                          transition={{
+                            duration: 4,
+                            repeat: Infinity,
+                            ease: 'easeInOut'
+                          }}
+                        >
+                          ARTIFICIAL INTELLIGENCE SYSTEM
+                        </motion.p>
+                        
+                        <motion.div
+                          className="text-sm text-white/60 font-mono"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ duration: 0.6, delay: 3 }}
+                        >
+                          {'> CONSCIOUSNESS AWAKENING...'.split('').map((char, i) => (
+                            <motion.span
+                              key={i}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{
+                                duration: 0.05,
+                                delay: 3 + i * 0.03
+                              }}
+                            >
+                              {char}
+                            </motion.span>
+                          ))}
+                        </motion.div>
+                      </motion.div>
+                    </>
+                  )}
+
+                  {/* Energy Burst Effect */}
+                  {introPhase >= 3 && (
+                    <motion.div
+                      className="absolute inset-0 pointer-events-none"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.5, delay: 3.5 }}
+                    >
+                      {Array.from({ length: 16 }).map((_, i) => {
+                        const angle = (i * Math.PI * 2) / 16;
+                        const distance = 300;
+                        const x = Math.cos(angle) * distance;
+                        const y = Math.sin(angle) * distance;
+                        
+                        return (
+                          <motion.div
+                            key={i}
+                            className="absolute w-1 h-32 bg-gradient-to-t from-rose-400 via-pink-300 to-transparent rounded-full"
+                            style={{
+                              left: '50%',
+                              top: '50%',
+                              transformOrigin: 'bottom center',
+                              transform: `translate(-50%, -100%) rotate(${(i * 360) / 16}deg)`,
+                              boxShadow: '0 0 15px rgba(244, 63, 94, 0.6)'
+                            }}
+                            initial={{ 
+                              opacity: 0, 
+                              scaleY: 0
+                            }}
+                            animate={{ 
+                              opacity: [0, 1, 0.8, 0],
+                              scaleY: [0, 1, 1.5, 0],
+                              x: [0, x * 0.3, x * 0.8, x],
+                              y: [0, y * 0.3, y * 0.8, y]
+                            }}
+                            transition={{
+                              duration: 2,
+                              delay: 3.5 + i * 0.05,
+                              ease: 'easeOut'
+                            }}
+                          />
+                        );
+                      })}
+                    </motion.div>
+                  )}
+
+                  {/* Final Consciousness Pulse */}
+                  {introPhase >= 4 && (
+                    <motion.div
+                      className="absolute inset-0 pointer-events-none"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3, delay: 4 }}
+                    >
+                      <motion.div
+                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full"
+                        style={{
+                          background: 'radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(244, 63, 94, 0.8) 100%)',
+                          boxShadow: '0 0 100px rgba(244, 63, 94, 0.8)'
+                        }}
+                        animate={{
+                          scale: [1, 50, 100],
+                          opacity: [1, 0.6, 0]
+                        }}
+                        transition={{
+                          duration: 1,
+                          delay: 4,
+                          ease: 'easeOut'
+                        }}
+                      />
+                    </motion.div>
+                  )}
+                </motion.div>
               </motion.div>
-            </motion.div>
+            )
           )}
         </AnimatePresence>
 

@@ -136,7 +136,7 @@ export default function Debug() {
               <strong>Supported:</strong> {speechRecognition.isSupported ? '✅' : '❌'}
             </div>
             <div>
-              <strong>Listening:</strong> {speechRecognition.isListening ? '🎤' : '🔇'}
+              {/* <strong>Listening:</strong> {speechRecognition.isListening ? '🎤' : '🔇'} */}
             </div>
             {speechRecognition.error && (
               <div className="text-red-400">

@@ -1,33 +1,26 @@
 import { NextResponse } from 'next/server';
-import { getAutoTransferManagerInstance } from '@/lib/autoTransferManager';
 import { Database } from '@/lib/database';
 
 export async function GET() {
   try {
-    const autoTransferManager = getAutoTransferManagerInstance();
     const database = Database.getInstance();
     
-    // Get auto-transfer stats
-    const stats = await autoTransferManager.getTransferStats();
-    
-    // Get user counts
-    const allUsers = await database.getAllUsers();
-    const paidUsers = allUsers.filter(user => user.isPaid);
+    // Get usage statistics
+    const stats = await database.getUsageStats();
     
     return NextResponse.json({
       success: true,
       status: 'running',
-      autoTransfer: {
-        isActive: stats.isPeriodicTransfersActive,
-        ownerWallet: stats.ownerWallet,
-        minTransferAmount: stats.minTransferAmount,
-        gasReserve: stats.gasReserve,
-        interval: '5 minutes',
-        mode: 'balance-check-only'
+      system: {
+        dailyLimit: '5 minutes',
+        resetTime: 'midnight local timezone',
+        mode: 'daily-limit'
       },
       users: {
-        total: allUsers.length,
-        paid: paidUsers.length
+        total: stats.totalUsers,
+        active: stats.activeUsers,
+        totalDailyUsage: stats.totalDailyUsage,
+        averageUsagePerUser: stats.averageUsagePerUser
       },
       timestamp: new Date().toISOString()
     });

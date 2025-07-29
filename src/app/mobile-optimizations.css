@@ -7,6 +7,9 @@
     -webkit-transform: translateZ(0);
     -webkit-backface-visibility: hidden;
     -webkit-perspective: 1000;
+    /* Prevent iOS Safari rendering issues */
+    -webkit-overflow-scrolling: touch;
+    -webkit-text-size-adjust: 100%;
   }
   
   /* Optimize animations for iOS */
@@ -21,6 +24,27 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+  
+  /* iOS-specific black screen prevention */
+  body {
+    background-color: #1f1f1e !important;
+    min-height: 100vh !important;
+    overflow: hidden !important;
+  }
+  
+  /* Ensure main container is always visible */
+  main {
+    background-color: #1f1f1e !important;
+    min-height: 100vh !important;
+    position: relative !important;
+    z-index: 1 !important;
+  }
+  
+  /* Prevent iOS Safari from hiding elements */
+  .gradient-rose-pink {
+    background: linear-gradient(135deg, #1f1f1e 0%, #2a1f1b 100%) !important;
+    min-height: 100vh !important;
   }
 }
 
@@ -84,6 +108,22 @@
   .particle-animation {
     animation-duration: 3s;
     animation-iteration-count: 1;
+  }
+  
+  /* iPhone-specific black screen prevention */
+  .fixed {
+    position: fixed !important;
+    z-index: 9999 !important;
+  }
+  
+  /* Ensure loading states are always visible */
+  .loading-state {
+    background-color: #1f1f1e !important;
+    color: white !important;
+    min-height: 100vh !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 }
 
@@ -159,5 +199,27 @@
   
   .animate-bounce {
     animation: none;
+  }
+}
+
+/* iOS-specific emergency fallback */
+@supports (-webkit-touch-callout: none) {
+  /* If everything else fails, show a simple fallback */
+  .ios-fallback {
+    background: #1f1f1e !important;
+    color: white !important;
+    min-height: 100vh !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 2rem !important;
+  }
+  
+  /* Prevent iOS Safari from hiding critical elements */
+  .critical-element {
+    position: relative !important;
+    z-index: 9999 !important;
+    background-color: #1f1f1e !important;
   }
 } 

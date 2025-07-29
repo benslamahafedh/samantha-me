@@ -24,7 +24,10 @@ export const metadata: Metadata = {
     // Audio session configuration
     "audio-session-category": "playAndRecord",
     "audio-session-mode": "voiceChat",
-    "audio-session-options": "defaultToSpeaker,allowBluetooth,allowBluetoothA2DP"
+    "audio-session-options": "defaultToSpeaker,allowBluetooth,allowBluetoothA2DP",
+    // Prevent zoom and scaling issues
+    "viewport-fit": "cover",
+    "format-detection": "telephone=no"
   },
   openGraph: {
     title: "Samantha - Voice Assistant",
@@ -54,7 +57,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
-  themeColor: '#f43f5e'
+  themeColor: '#1f1f1e'
 };
 
 export default function RootLayout({
@@ -64,6 +67,43 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        {/* iOS-specific early detection and fixes */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                // Detect iOS early
+                var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                
+                if (isIOS) {
+                  console.log('🍎 iOS detected - applying early fixes');
+                  
+                  // Add iOS class to body
+                  document.documentElement.classList.add('ios-device');
+                  
+                  // Prevent iOS Safari from hiding elements
+                  document.addEventListener('DOMContentLoaded', function() {
+                    document.body.style.backgroundColor = '#1f1f1e';
+                    document.body.style.minHeight = '100vh';
+                    document.body.style.overflow = 'hidden';
+                  });
+                  
+                  // Audio context polyfill
+                  if (!window.AudioContext && window.webkitAudioContext) {
+                    window.AudioContext = window.webkitAudioContext;
+                  }
+                  
+                  // Prevent iOS Safari audio issues
+                  document.addEventListener('touchstart', function() {
+                    // This helps prevent audio context suspension
+                  }, { passive: true });
+                }
+              })();
+            `
+          }}
+        />
+      </head>
       <body className="antialiased" suppressHydrationWarning={true}>
         <ErrorBoundary>
           {children}

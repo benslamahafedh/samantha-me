@@ -1,95 +1,99 @@
 'use client';
 
-import { useState } from 'react';
+import React from 'react';
 
 interface VoiceErrorDisplayProps {
   error: string | null;
   onRetry: () => void;
   onDismiss: () => void;
-  onRequestPermission: () => void;
+  onRequestPermission?: () => void;
 }
 
 export default function VoiceErrorDisplay({ 
   error, 
   onRetry, 
-  onDismiss, 
+  onDismiss,
   onRequestPermission 
 }: VoiceErrorDisplayProps) {
-  const [isIOS] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return /iPad|iPhone|iPod/.test(navigator.userAgent);
-  });
-
   if (!error) return null;
 
-  const isPermissionError = error.toLowerCase().includes('permission') || 
-                           error.toLowerCase().includes('microphone') ||
-                           error.toLowerCase().includes('access');
-  
-  const isIOSAudioError = isIOS && (error.toLowerCase().includes('audio') || 
-                                   error.toLowerCase().includes('initialization'));
+  const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const isMicrophoneError = error.includes('microphone') || error.includes('Microphone');
+  const isAudioError = error.includes('audio') || error.includes('Audio');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75 p-4">
-      <div className="bg-gray-900 rounded-lg p-6 max-w-md w-full text-center">
-        <div className="text-red-400 text-4xl mb-4">
-          {isIOS ? '🍎' : '🎤'}
-        </div>
-        
-        <h3 className="text-white text-lg font-medium mb-2">
-          {isIOSAudioError ? 'iOS Audio Issue' : 'Voice Error'}
-        </h3>
-        
-        <p className="text-gray-300 text-sm mb-4">
-          {error}
-        </p>
-
-        {isIOSAudioError && (
-          <div className="bg-blue-900 bg-opacity-50 rounded p-3 mb-4 text-left">
-            <p className="text-blue-200 text-xs mb-2 font-medium">iOS Audio Fixes:</p>
-            <ul className="text-blue-100 text-xs space-y-1">
-              <li>• Make sure your device is not on silent mode</li>
-              <li>• Check that Safari has microphone permission</li>
-              <li>• Try refreshing the page</li>
-              <li>• Ensure you're using Safari browser</li>
-            </ul>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-white rounded-2xl p-8 max-w-md mx-4 shadow-2xl">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100 flex items-center justify-center">
+            <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
           </div>
-        )}
+          
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            {isIOS ? 'iOS Audio Issue' : 'Voice Error'}
+          </h3>
+          
+          <p className="text-gray-600 mb-6">
+            {error}
+          </p>
 
-        {isPermissionError && (
-          <div className="bg-yellow-900 bg-opacity-50 rounded p-3 mb-4 text-left">
-            <p className="text-yellow-200 text-xs mb-2 font-medium">Permission Required:</p>
-            <ul className="text-yellow-100 text-xs space-y-1">
-              <li>• Allow microphone access when prompted</li>
-              <li>• Check browser settings for microphone permissions</li>
-              <li>• Try refreshing the page</li>
-            </ul>
-          </div>
-        )}
-
-        <div className="flex flex-col space-y-2">
-          {isPermissionError && (
-            <button
-              onClick={onRequestPermission}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
-            >
-              Grant Microphone Permission
-            </button>
+          {isIOS && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
+              <h4 className="font-medium text-blue-900 mb-2">iOS Troubleshooting:</h4>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Make sure your device is not on silent mode</li>
+                <li>• Use Safari browser (not Chrome/Firefox)</li>
+                <li>• Go to Settings → Safari → Microphone → Allow</li>
+                <li>• Try refreshing the page</li>
+                <li>• Check that media volume is turned up</li>
+              </ul>
+            </div>
           )}
-          
-          <button
-            onClick={onRetry}
-            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
-          >
-            Try Again
-          </button>
-          
-          <button
-            onClick={onDismiss}
-            className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors"
-          >
-            Dismiss
-          </button>
+
+          {isMicrophoneError && onRequestPermission && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
+              <h4 className="font-medium text-yellow-900 mb-2">Microphone Access:</h4>
+              <p className="text-sm text-yellow-800">
+                The app needs microphone access to work. Please allow microphone permissions when prompted.
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            {onRequestPermission && isMicrophoneError && (
+              <button
+                onClick={onRequestPermission}
+                className="flex-1 bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+              >
+                Allow Microphone
+              </button>
+            )}
+            
+            <button
+              onClick={onRetry}
+              className="flex-1 bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors"
+            >
+              Try Again
+            </button>
+            
+            <button
+              onClick={onDismiss}
+              className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors"
+            >
+              Dismiss
+            </button>
+          </div>
+
+          {isIOS && (
+            <div className="mt-4 text-xs text-gray-500">
+              <p>If the issue persists, try:</p>
+              <p>1. Closing Safari completely and reopening</p>
+              <p>2. Restarting your device</p>
+              <p>3. Checking for iOS updates</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

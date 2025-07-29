@@ -1,140 +1,103 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import CryptoPaymentModal from '@/components/CryptoPaymentModal';
-import { getSessionManager } from '@/lib/sessionManager';
+import { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
 
 export default function SessionEnded() {
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [timeUsed, setTimeUsed] = useState(0);
+  const [timeUntilReset, setTimeUntilReset] = useState<string>('');
 
   useEffect(() => {
-    const sessionManager = getSessionManager();
-    
-    const loadSessionInfo = async () => {
-      const sessionInfo = await sessionManager.getSessionInfo();
-    
-    if (sessionInfo) {
-        // Use stub values since the actual properties don't exist
-        setTimeUsed(180000); // 3 minutes in milliseconds
+    const calculateTimeUntilReset = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      tomorrow.setHours(0, 0, 0, 0);
       
-        // Check if user has paid (stub implementation)
-        const isPaid = false; // This would come from the actual user data
-        if (isPaid) {
-        window.location.href = '/';
-        return;
-      }
-    }
+      const timeDiff = tomorrow.getTime() - now.getTime();
+      const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+      const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+      
+      return `${hours}h ${minutes}m`;
     };
+
+    setTimeUntilReset(calculateTimeUntilReset());
     
-    loadSessionInfo();
-    
-    // Log that access is blocked
-    console.log('🔒 Session ended page - blocking all voice access');
+    const interval = setInterval(() => {
+      setTimeUntilReset(calculateTimeUntilReset());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
   }, []);
 
-  const handlePaymentSuccess = () => {
-    // Redirect back to main page after successful payment
-    window.location.href = '/';
-  };
-
-  const handleTryAgain = () => {
-    // Check if user can start a new session
-    const sessionManager = getSessionManager();
-    const canStart = sessionManager.canStartSession();
-    
-    if (canStart) {
-      window.location.href = '/';
-    } else {
-      setShowPaymentModal(true);
-    }
-  };
-
   return (
-    <main className="min-h-screen gradient-rose-pink relative overflow-hidden flex items-center justify-center">
-      {/* Background effects */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-0 -left-4 w-96 h-96 bg-rose-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob"></div>
-        <div className="absolute top-0 -right-4 w-96 h-96 bg-pink-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-2000"></div>
-        <div className="absolute -bottom-8 left-20 w-96 h-96 bg-purple-500 rounded-full mix-blend-multiply filter blur-3xl animate-blob animation-delay-4000"></div>
-      </div>
-
-      {/* Main content */}
-      <div className="relative z-10 text-center max-w-md mx-auto px-6">
-        <div className="glass-card rounded-3xl p-8 backdrop-blur-sm border border-white/10">
-          {/* Session ended icon */}
-          <div className="mb-6">
-            <div className="w-20 h-20 mx-auto bg-gradient-to-br from-rose-400 to-pink-600 rounded-full flex items-center justify-center">
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-          </div>
-
-          <h1 className="text-2xl font-bold text-white mb-4">
-            Session Time Expired
-          </h1>
+    <main className="min-h-screen flex items-center justify-center p-8 gradient-rose-pink">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.8, ease: 'easeOut' }}
+        className="max-w-md w-full text-center"
+      >
+        <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-8 shadow-soft-rose">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="w-16 h-16 mx-auto mb-6 rounded-full bg-rose-100 flex items-center justify-center"
+          >
+            <svg className="w-8 h-8 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </motion.div>
           
-          <p className="text-white/80 mb-2">
-            You&apos;ve used your {Math.floor(timeUsed / 60)} minute free trial with Samantha.
-          </p>
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+            className="text-2xl font-light text-gray-800 mb-4"
+          >
+            Daily Limit Reached
+          </motion.h2>
           
-          <p className="text-white/60 text-sm mb-6">
-            To continue enjoying unlimited conversations with your AI assistant, please upgrade to premium access.
-          </p>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.6 }}
+            className="text-gray-600 font-light mb-6 leading-relaxed"
+          >
+            You've used your 5 minutes of daily conversation time with Samantha. 
+            Come back tomorrow for more intimate conversations!
+          </motion.p>
 
-          {/* Benefits list */}
-          <div className="text-left mb-6 space-y-2">
-            <div className="flex items-center text-white/80 text-sm">
-              <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Unlimited conversation time
-            </div>
-            <div className="flex items-center text-white/80 text-sm">
-              <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Advanced AI responses
-            </div>
-            <div className="flex items-center text-white/80 text-sm">
-              <svg className="w-4 h-4 text-green-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Priority support
-            </div>
-          </div>
-
-          {/* Action buttons */}
-          <div className="space-y-3">
-            <button
-              onClick={() => setShowPaymentModal(true)}
-              className="w-full bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white font-semibold py-3 px-6 rounded-2xl transition-all duration-200 transform hover:scale-105 shadow-lg"
-            >
-              Upgrade for 0.01 SOL
-            </button>
-            
-            <button
-              onClick={handleTryAgain}
-              className="w-full bg-white/10 hover:bg-white/20 text-white font-medium py-3 px-6 rounded-2xl transition-all duration-200 border border-white/20"
-            >
-              Try Again
-            </button>
-          </div>
-
-          <p className="text-white/50 text-xs mt-4">
-            Secure payments powered by Solana blockchain
-          </p>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6, duration: 0.6 }}
+            className="bg-gradient-to-r from-rose-500/20 to-pink-500/20 border border-rose-500/30 rounded-xl p-4 mb-6"
+          >
+            <p className="text-rose-700 font-medium mb-2">Next reset in:</p>
+            <p className="text-2xl font-bold text-rose-600">{timeUntilReset}</p>
+          </motion.div>
+          
+          <motion.button
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7, duration: 0.6 }}
+            onClick={() => window.location.reload()}
+            className="w-full bg-gradient-to-r from-rose-500 to-pink-500 text-white font-medium py-3 px-6 rounded-xl hover:from-rose-600 hover:to-pink-600 transition-all duration-200 shadow-soft-rose"
+          >
+            Try Again
+          </motion.button>
+          
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8, duration: 0.6 }}
+            className="mt-4 text-xs text-gray-400"
+          >
+            Note: Daily limits reset at midnight in your local timezone
+          </motion.p>
         </div>
-      </div>
-
-      {/* Crypto Payment Modal */}
-      <CryptoPaymentModal
-        isOpen={showPaymentModal}
-        onClose={() => setShowPaymentModal(false)}
-        onPaymentSuccess={handlePaymentSuccess}
-        sessionId={`session-${Date.now()}`}
-      />
+      </motion.div>
     </main>
   );
 } 

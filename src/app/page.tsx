@@ -3,10 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import OptimizedVoiceManager from '@/components/OptimizedVoiceManager';
 import VoiceVisualization from '@/components/VoiceVisualization';
-import CryptoPaymentModal from '@/components/CryptoPaymentModal';
 import VoiceErrorDisplay from '@/components/VoiceErrorDisplay';
-import SessionTimer from '@/components/SessionTimer';
-import MuteIndicator from '@/components/MuteIndicator';
 
 export default function Home() {
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -14,28 +11,32 @@ export default function Home() {
   const [hasStarted, setHasStarted] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [isIntroComplete, setIsIntroComplete] = useState(false);
-  const [sessionTimeLeft, setSessionTimeLeft] = useState(180); // 3 minutes
   const [sessionEnded, setSessionEnded] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [hasWalletAccess, setHasWalletAccess] = useState(false);
-  const [isTrialActive, setIsTrialActive] = useState(false);
   const [sessionId, setSessionId] = useState<string>('');
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [audioInitialized, setAudioInitialized] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [audioError, setAudioError] = useState<string | null>(null);
+  const [isDevMode, setIsDevMode] = useState(false);
 
   // iOS detection and audio initialization
   useEffect(() => {
     // Only run on client side
     if (typeof window === 'undefined') return;
     
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    // Check for development mode (URL parameter or localStorage)
+    const urlParams = new URLSearchParams(window.location.search);
+    const devMode = urlParams.get('dev') === 'ios' || localStorage.getItem('samantha_dev_ios') === 'true';
+    setIsDevMode(devMode);
+    
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) || devMode;
     setIsIOS(isIOSDevice);
     
     if (isIOSDevice) {
       console.log('🍎 iOS device detected - initializing audio session');
       console.log('📱 User Agent:', navigator.userAgent);
+      console.log('🔧 Dev Mode:', devMode);
       
       // Initialize iOS audio session
       const initializeIOSAudio = async () => {
@@ -82,20 +83,24 @@ export default function Home() {
             oscillator.stop(audioContext.currentTime + 0.001);
             
             setAudioInitialized(true);
+            setIsLoading(false);
             console.log('✅ iOS audio session activated successfully');
           } else {
             console.error('❌ AudioContext not available');
-            setVoiceError('Audio not supported on this device');
+            setAudioError('Audio not supported on this device');
+            setIsLoading(false);
           }
         } catch (error) {
           console.error('❌ iOS audio initialization failed:', error);
-          setVoiceError(`Audio initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          setAudioError(`Audio initialization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          setIsLoading(false);
         }
       };
       
       // Initialize audio on user interaction
       const handleUserInteraction = () => {
         console.log('👆 User interaction detected - initializing audio...');
+        setAudioError(null);
         initializeIOSAudio();
         document.removeEventListener('touchstart', handleUserInteraction);
         document.removeEventListener('click', handleUserInteraction);
@@ -107,11 +112,23 @@ export default function Home() {
       // Also try to initialize on page load
       console.log('🚀 Attempting initial audio initialization...');
       initializeIOSAudio();
+      
+      // Fallback: if audio doesn't initialize within 5 seconds, show error
+      const fallbackTimer = setTimeout(() => {
+        if (!audioInitialized && !audioError) {
+          console.log('⏰ Audio initialization timeout - showing fallback');
+          setAudioError('Audio initialization timeout. Please tap the screen to retry.');
+          setIsLoading(false);
+        }
+      }, 5000);
+      
+      return () => clearTimeout(fallbackTimer);
     } else {
       console.log('🖥️ Non-iOS device detected');
       setAudioInitialized(true);
+      setIsLoading(false);
     }
-  }, []);
+  }, [audioInitialized]);
 
   // Initialize session
   useEffect(() => {
@@ -138,12 +155,6 @@ export default function Home() {
         if (data.success) {
           setSessionId(data.sessionId);
           localStorage.setItem('samantha_session_id', data.sessionId);
-          
-          // If user has access, update the state
-          if (data.hasAccess) {
-            setHasWalletAccess(true);
-            setIsTrialActive(data.reason === 'Trial access active');
-          }
         }
       } catch (error) {
         console.error('Failed to initialize session:', error);
@@ -167,6 +178,20 @@ export default function Home() {
       window.removeEventListener('sessionInitialized', handleSessionInitialized as EventListener);
     };
   }, [isIOS, audioInitialized]);
+
+  // iOS fallback: if audio fails to initialize after 10 seconds, proceed anyway
+  useEffect(() => {
+    if (isIOS && !audioInitialized && !audioError) {
+      const fallbackTimer = setTimeout(() => {
+        console.log('⏰ iOS audio initialization timeout - proceeding with fallback');
+        setAudioInitialized(true);
+        setIsLoading(false);
+        setAudioError('Audio initialization incomplete. Some features may not work properly.');
+      }, 10000);
+      
+      return () => clearTimeout(fallbackTimer);
+    }
+  }, [isIOS, audioInitialized, audioError]);
 
   // Mobile-specific fixes to prevent interference with voice interaction
   useEffect(() => {
@@ -249,77 +274,10 @@ export default function Home() {
     setIsReady(ready);
   };
 
-  const handleSessionTimeChange = (timeLeft: number) => {
-    // Only update timer for trial users, not paid users
-    if (!hasWalletAccess) {
-      setSessionTimeLeft(timeLeft);
-    }
-  };
+
 
   const handleSessionEndedChange = (sessionEnded: boolean) => {
     setSessionEnded(sessionEnded);
-  };
-
-  const handleRequirePayment = () => {
-    if (sessionId && sessionId.trim() !== '') {
-      setShowPaymentModal(true);
-    } else {
-      console.error('Cannot show payment modal: Session ID is not available');
-      // Try to reinitialize session
-      const initializeSession = async () => {
-        try {
-          const response = await fetch('/api/session', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sessionId: null })
-          });
-          
-          const data = await response.json();
-          
-          if (data.success) {
-            setSessionId(data.sessionId);
-            localStorage.setItem('samantha_session_id', data.sessionId);
-          }
-        } catch (error) {
-          console.error('Failed to initialize session for payment:', error);
-        }
-      };
-      
-      initializeSession();
-    }
-  };
-
-  const handlePaymentSuccess = async () => {
-    setShowPaymentModal(false);
-    setSessionEnded(false);
-    
-    // Refresh session access status
-    try {
-      const response = await fetch('/api/session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        // Update access status immediately
-        setHasWalletAccess(data.hasAccess);
-        setIsTrialActive(data.reason === 'Trial access active');
-        
-        // Trigger access status change
-        handleAccessStatusChange(data.hasAccess, data.reason === 'Trial access active');
-        
-        // Dispatch payment success event for SecureVoiceManager
-        const paymentSuccessEvent = new Event('paymentSuccess');
-        window.dispatchEvent(paymentSuccessEvent);
-        
-        console.log('🎉 Payment success handled - access status updated');
-      }
-    } catch (error) {
-      console.error('Failed to refresh session after payment:', error);
-    }
   };
 
   const handleIntroComplete = useCallback(() => {
@@ -331,20 +289,58 @@ export default function Home() {
     window.dispatchEvent(event);
   }, []);
 
-  const handleAccessStatusChange = useCallback((hasAccess: boolean, trialActive: boolean) => {
-    setHasWalletAccess(hasAccess);
-    setIsTrialActive(trialActive);
-  }, []);
-
   // Show loading state for iOS while audio initializes
-  if (isIOS && !audioInitialized) {
+  if (isLoading) {
     return (
-      <main className="relative min-h-screen overflow-hidden select-none touch-none">
+      <main className="relative min-h-screen overflow-hidden select-none touch-none gradient-rose-pink">
         <div className="relative min-h-screen select-none touch-none flex items-center justify-center">
-          <div className="text-center text-white">
-            <div className="animate-pulse text-2xl mb-4">🍎</div>
-            <div className="text-lg mb-2">Initializing audio...</div>
-            <div className="text-sm text-gray-400">Tap anywhere to continue</div>
+          <div className="text-center text-white p-8">
+            <div className="animate-pulse text-4xl mb-6">🍎</div>
+            <div className="text-xl mb-4 font-medium">Initializing Samantha...</div>
+            <div className="text-sm text-gray-300 mb-6">
+              {isIOS ? 'Setting up audio for iOS' : 'Loading voice assistant'}
+            </div>
+            {isIOS && (
+              <div className="text-xs text-gray-400 space-y-2">
+                <div>• Make sure your device is not on silent mode</div>
+                <div>• Use Safari browser for best compatibility</div>
+                <div>• Tap anywhere to activate audio</div>
+              </div>
+            )}
+            <div className="mt-8">
+              <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin mx-auto"></div>
+            </div>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  // Show error state if audio initialization failed
+  if (audioError) {
+    return (
+      <main className="relative min-h-screen overflow-hidden select-none touch-none gradient-rose-pink">
+        <div className="relative min-h-screen select-none touch-none flex items-center justify-center">
+          <div className="text-center text-white p-8 max-w-sm">
+            <div className="text-4xl mb-6">❌</div>
+            <div className="text-xl mb-4 font-medium">Audio Setup Failed</div>
+            <div className="text-sm text-gray-300 mb-6">{audioError}</div>
+            <div className="text-xs text-gray-400 space-y-2 mb-6">
+              <div>• Check that your device is not on silent mode</div>
+              <div>• Try using Safari browser</div>
+              <div>• Make sure microphone permissions are allowed</div>
+            </div>
+            <button 
+              onClick={() => {
+                setAudioError(null);
+                setIsLoading(true);
+                // Force re-initialization
+                window.location.reload();
+              }}
+              className="bg-white/20 backdrop-blur-sm text-white px-6 py-3 rounded-xl hover:bg-white/30 transition-all"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </main>
@@ -354,15 +350,22 @@ export default function Home() {
   return (
     <main className="relative min-h-screen overflow-hidden select-none touch-none">
         <div className="relative min-h-screen select-none touch-none">
-          {/* Mute Indicator */}
-          <MuteIndicator isMuted={isMuted} />
-          
-          {/* Session Timer */}
-          <SessionTimer 
-            timeLeft={hasWalletAccess ? 3600 : sessionTimeLeft} // Show 1 hour for paid users
-            isTrialActive={isTrialActive}
-            hasWalletAccess={hasWalletAccess}
-          />
+                    {/* Development Mode Toggle */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="fixed top-4 right-4 z-50">
+              <button
+                onClick={() => {
+                  const newMode = !isDevMode;
+                  setIsDevMode(newMode);
+                  localStorage.setItem('samantha_dev_ios', newMode.toString());
+                  window.location.reload();
+                }}
+                className="bg-blue-500 text-white px-3 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
+              >
+                {/* {isDevMode ? '🍎 iOS Mode' : '🖥️ Desktop Mode'} */}
+              </button>
+            </div>
+          )}
 
           <VoiceVisualization 
             isListening={isListening}
@@ -374,8 +377,6 @@ export default function Home() {
             isIntroComplete={isIntroComplete}
             onIntroComplete={handleIntroComplete}
             onStartConversation={handleStartConversation}
-            sessionTimeLeft={sessionTimeLeft}
-            isMuted={isMuted}
             sessionEnded={sessionEnded}
           />
 
@@ -393,23 +394,18 @@ export default function Home() {
             onListeningChange={setIsListening}
             onHasStartedChange={handleHasStartedChange}
             onIsReadyChange={handleIsReadyChange}
-            onSessionTimeChange={handleSessionTimeChange}
             onSessionEndedChange={handleSessionEndedChange}
-            onRequirePayment={handleRequirePayment}
-            onAccessStatusChange={handleAccessStatusChange}
+            onRequirePayment={() => {
+              // No payment required - just end session
+              setSessionEnded(true);
+            }}
+            onAccessStatusChange={() => {
+              // No access status changes needed
+            }}
             sessionId={sessionId}
             onVoiceError={setVoiceError}
-            onMuteChange={setIsMuted}
           />
         </div>
-
-        {/* Crypto Payment Modal */}
-        <CryptoPaymentModal
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          onPaymentSuccess={handlePaymentSuccess}
-          sessionId={sessionId}
-        />
 
         {/* Voice Error Display */}
         <VoiceErrorDisplay

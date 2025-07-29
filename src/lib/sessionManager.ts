@@ -8,6 +8,8 @@ interface SessionData {
   expiresAt: Date;
   userAgent: string;
   ipAddress: string;
+  dailyUsageStart?: Date;
+  dailyUsageMinutes?: number;
 }
 
 // SECURITY FIX: Server-side session storage with expiration
@@ -25,8 +27,8 @@ export class SessionManager {
   private database: Database;
   private sessions: Map<string, SessionData>;
   private readonly SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-  private readonly TRIAL_DURATION = 3 * 60 * 1000; // 3 minutes
-  private readonly PAID_DURATION = 60 * 60 * 1000; // 1 hour
+  private readonly DAILY_LIMIT_MINUTES = 5; // 5 minutes per day
+  private readonly DAILY_RESET_HOURS = 24; // Reset every 24 hours
 
   private constructor() {
     this.database = Database.getInstance();
@@ -51,6 +53,49 @@ export class SessionManager {
     return crypto.randomBytes(32).toString('hex');
   }
 
+  // Check if daily limit has been reset
+  private isDailyLimitReset(session: SessionData): boolean {
+    if (!session.dailyUsageStart) return true;
+    
+    const now = new Date();
+    const lastUsage = new Date(session.dailyUsageStart);
+    const hoursSinceLastUsage = (now.getTime() - lastUsage.getTime()) / (1000 * 60 * 60);
+    
+    return hoursSinceLastUsage >= this.DAILY_RESET_HOURS;
+  }
+
+  // Get remaining daily usage time
+  private getRemainingDailyTime(session: SessionData): number {
+    if (this.isDailyLimitReset(session)) {
+      return this.DAILY_LIMIT_MINUTES * 60 * 1000; // 5 minutes in milliseconds
+    }
+    
+    const usedMinutes = session.dailyUsageMinutes || 0;
+    const remainingMinutes = Math.max(0, this.DAILY_LIMIT_MINUTES - usedMinutes);
+    return remainingMinutes * 60 * 1000; // Convert to milliseconds
+  }
+
+  // Update daily usage
+  private updateDailyUsage(session: SessionData, usedMinutes: number): SessionData {
+    const now = new Date();
+    
+    if (this.isDailyLimitReset(session)) {
+      // Reset daily usage
+      return {
+        ...session,
+        dailyUsageStart: now,
+        dailyUsageMinutes: usedMinutes
+      };
+    } else {
+      // Add to existing usage
+      const currentUsage = session.dailyUsageMinutes || 0;
+      return {
+        ...session,
+        dailyUsageMinutes: currentUsage + usedMinutes
+      };
+    }
+  }
+
   // SECURITY FIX: Validate session with proper checks
   async validateSession(sessionId: string, userAgent?: string, ipAddress?: string): Promise<boolean> {
     const session = this.sessions.get(sessionId);
@@ -68,7 +113,7 @@ export class SessionManager {
     if (userAgent && session.userAgent !== userAgent) {
       console.warn('Session validation failed: User agent mismatch');
       return false;
-  }
+    }
 
     if (ipAddress && session.ipAddress !== ipAddress) {
       console.warn('Session validation failed: IP address mismatch');
@@ -115,13 +160,15 @@ export class SessionManager {
       lastActivity: now,
       expiresAt,
       userAgent: userAgent || 'unknown',
-      ipAddress: ipAddress || 'unknown'
+      ipAddress: ipAddress || 'unknown',
+      dailyUsageStart: now,
+      dailyUsageMinutes: 0
     };
 
     this.sessions.set(sessionId, sessionData);
 
     // Create user in database
-    const user = await this.database.createAnonymousUser(sessionId, this.TRIAL_DURATION / 60000);
+    const user = await this.database.createAnonymousUser(sessionId, this.DAILY_LIMIT_MINUTES);
 
     return {
       sessionId,
@@ -130,7 +177,7 @@ export class SessionManager {
     };
   }
 
-  // Check access with session validation
+  // Check access with daily limit validation
   async checkAccess(sessionId: string, userAgent?: string, ipAddress?: string): Promise<{
     hasAccess: boolean;
     reason: string;
@@ -152,66 +199,23 @@ export class SessionManager {
     return accessResult;
   }
 
-  // Get payment address for session
-  async getPaymentAddress(sessionId: string, userAgent?: string, ipAddress?: string): Promise<{
-    walletAddress: string;
-    referenceId: string;
-    amount: number;
-    expiresAt: Date;
-  } | null> {
-    // SECURITY FIX: Validate session
-    const isValidSession = await this.validateSession(sessionId, userAgent, ipAddress);
-    if (!isValidSession) {
-      return null;
-    }
+  // Update session usage time
+  async updateSessionUsage(sessionId: string, usedMinutes: number): Promise<boolean> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
 
-    const user = await this.database.getUserBySessionId(sessionId);
-    if (!user) return null;
-
-    return {
-      walletAddress: user.walletAddress,
-      referenceId: user.referenceId,
-      amount: 0.0009, // Fixed amount
-      expiresAt: new Date(Date.now() + 30 * 60 * 1000) // 30 minutes
-    };
+    const updatedSession = this.updateDailyUsage(session, usedMinutes);
+    this.sessions.set(sessionId, updatedSession);
+    
+    return true;
   }
 
-  // Mark payment received
-  async markPaymentReceived(sessionId: string, txId: string, amount: number, userAgent?: string, ipAddress?: string): Promise<boolean> {
-    // SECURITY FIX: Validate session
-    const isValidSession = await this.validateSession(sessionId, userAgent, ipAddress);
-    if (!isValidSession) {
-      return false;
-    }
+  // Get remaining daily time for a session
+  async getRemainingDailyTimeForSession(sessionId: string): Promise<number> {
+    const session = this.sessions.get(sessionId);
+    if (!session) return 0;
 
-    const user = await this.database.markUserAsPaid(sessionId, txId, amount, this.PAID_DURATION / 3600000);
-    return user !== null;
-  }
-
-  // Get session recovery info
-  async getSessionRecoveryInfo(sessionId: string): Promise<{
-    sessionId: string;
-    walletAddress: string;
-    referenceId: string;
-    status: 'trial' | 'paid' | 'expired';
-    expiresAt: Date | null;
-  } | null> {
-    const user = await this.database.getUserBySessionId(sessionId);
-    if (!user) return null;
-    const now = new Date();
-    let status: 'trial' | 'paid' | 'expired' = 'expired';
-    if (user.isPaid && user.accessExpiresAt && now < user.accessExpiresAt) {
-      status = 'paid';
-    } else if (now < user.trialExpiresAt) {
-      status = 'trial';
-    }
-    return {
-      sessionId: user.sessionId,
-      walletAddress: user.walletAddress,
-      referenceId: user.referenceId,
-      status,
-      expiresAt: status === 'paid' ? user.accessExpiresAt : user.trialExpiresAt
-    };
+    return this.getRemainingDailyTime(session);
   }
 
   // SECURITY FIX: Clean up expired sessions
@@ -223,7 +227,7 @@ export class SessionManager {
       if (now > session.expiresAt) {
         this.sessions.delete(sessionId);
         deletedCount++;
-  }
+      }
     }
 
     if (deletedCount > 0) {
@@ -267,17 +271,11 @@ export class SessionManager {
   // Get admin statistics
   async getAdminStats(): Promise<{
     totalUsers: number;
-    trialUsers: number;
-    paidUsers: number;
-    totalRevenue: number;
-    recentPayments: unknown[];
+    activeUsers: number;
+    totalDailyUsage: number;
+    averageUsagePerUser: number;
   }> {
-    return await this.database.getPaymentStats();
-  }
-
-  // Get user by wallet address (for webhook processing)
-  async getUserByWalletAddress(walletAddress: string): Promise<unknown | null> {
-    return await this.database.getUserByWalletAddress(walletAddress);
+    return await this.database.getUsageStats();
   }
 
   // Event listeners for session management

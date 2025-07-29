@@ -21,18 +21,12 @@ export async function POST(req: NextRequest) {
       reason: accessResult.reason,
       user: user ? {
         sessionId: user.sessionId,
-        walletAddress: user.walletAddress,
-        referenceId: user.referenceId,
-        isPaid: user.isPaid,
+        dailyUsageMinutes: user.dailyUsageMinutes,
+        lastUsageDate: user.lastUsageDate,
         trialExpiresAt: user.trialExpiresAt,
-        accessExpiresAt: user.accessExpiresAt,
-        amountReceived: user.amountReceived,
-        paymentReceivedAt: user.paymentReceivedAt,
-        txId: user.txId
+        createdAt: user.createdAt
       } : null,
       environment: {
-        hasHeliusApiKey: !!process.env.HELIUS_API_KEY,
-        hasSolanaRpc: !!(process.env.SOLANA_RPC_URL || process.env.HELIUS_RPC_URL),
         nodeEnv: process.env.NODE_ENV
       }
     };
