@@ -241,4 +241,36 @@
     z-index: 9999 !important;
     background-color: #1f1f1e !important;
   }
+}
+
+/* Safari-specific positioning fixes */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  /* Safari-specific transform fixes */
+  .safari-fixed {
+    transform: translateX(-50%) !important;
+    -webkit-transform: translateX(-50%) !important;
+  }
+  
+  /* Safari button positioning */
+  .safari-button {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    -webkit-transform: translateX(-50%) !important;
+  }
+  
+  /* Safari footer positioning */
+  .safari-footer {
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    -webkit-transform: translateX(-50%) !important;
+    width: 100% !important;
+    max-width: 24rem !important;
+    text-align: center !important;
+  }
+  
+  /* Safari text positioning */
+  .safari-text {
+    text-align: center !important;
+    width: 100% !important;
+  }
 } 
