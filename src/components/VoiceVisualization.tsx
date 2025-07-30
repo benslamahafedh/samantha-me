@@ -699,12 +699,7 @@ export default function VoiceVisualization({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 20 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-[9999] pointer-events-auto"
-            style={{
-              left: '50%',
-              transform: 'translateX(-50%)',
-              bottom: '5rem'
-            }}
+            className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-[9999] pointer-events-auto safari-button"
           >
             <motion.button
               onClick={(e) => {
@@ -718,8 +713,14 @@ export default function VoiceVisualization({
                   const event = new CustomEvent('manualComplete');
                   window.dispatchEvent(event);
                 } else {
-                  // Start listening
+                  // Start listening with iOS audio activation
                   console.log('Starting listening...');
+                  
+                  // iOS audio activation on first click
+                  if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+                    handleFirstTouch();
+                  }
+                  
                   const event = new CustomEvent('startListening');
                   window.dispatchEvent(event);
                 }
@@ -756,16 +757,14 @@ export default function VoiceVisualization({
         {/* Status Text - responsive - hidden when speaking OR listening */}
         {hasStarted && !isSpeaking && !isListening && !sessionEnded && (
         <motion.div
-          className="text-center mb-4 sm:mb-6 px-4"
+          className="text-center mb-4 sm:mb-6 px-4 w-full safari-text"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.3 }}
           style={{
             position: 'relative',
-            zIndex: 10,
-            width: '100%',
-            textAlign: 'center'
+            zIndex: 10
           }}
         >
           <p className={`text-base sm:text-lg font-light ${getStatusColor()}`}>
@@ -899,18 +898,10 @@ export default function VoiceVisualization({
         {/* Footer - simplified positioning */}
         {!sessionEnded && (
           <motion.div
-            className="fixed bottom-4 sm:bottom-8 left-1/2 transform -translate-x-1/2 px-4 w-full max-w-sm"
+            className="fixed bottom-4 sm:bottom-8 left-1/2 transform -translate-x-1/2 px-4 w-full max-w-sm text-center safari-footer"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            style={{
-              left: '50%',
-              transform: 'translateX(-50%)',
-              bottom: '1rem',
-              width: '100%',
-              maxWidth: '24rem',
-              textAlign: 'center'
-            }}
           >
             <p className="text-white/40 text-xs sm:text-sm font-light text-center">
               {hasStarted ? 'Powered by OMNIAOS • Speak naturally' : 'Powered by OMNIAOS • Voice interface'}
@@ -931,22 +922,7 @@ export default function VoiceVisualization({
           </motion.div>
         )}
 
-        {/* iOS Audio Activation Button */}
-        {isMounted && hasStarted && typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && (
-          <motion.div
-            className="fixed top-4 left-4 z-[9999]"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.3 }}
-          >
-            <button
-              onClick={handleFirstTouch}
-              className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-2 rounded-lg shadow-lg"
-            >
-              🔧 iOS Audio
-            </button>
-          </motion.div>
-        )}
+
       </div>
 
       {/* iOS Audio Instructions removed */}
