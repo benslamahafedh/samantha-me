@@ -122,11 +122,27 @@ export default function VoiceVisualization({
   // iOS Audio Context Activation on first touch
   const handleFirstTouch = useCallback(() => {
     if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+      console.log('iOS touch detected - activating audio context');
+      
+      // Create a silent audio element to trigger user interaction
+      const silentAudio = new Audio();
+      silentAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+      silentAudio.volume = 0;
+      silentAudio.play().catch(() => {
+        console.log('Silent audio play failed - this is expected');
+      });
+      
+      // Also try to resume any existing audio context
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContext) {
+        // Try to get existing audio context or create new one
         const audioContext = new AudioContext();
         if (audioContext.state === 'suspended') {
-          audioContext.resume();
+          audioContext.resume().then(() => {
+            console.log('iOS audio context resumed successfully');
+          }).catch((error) => {
+            console.error('Failed to resume audio context:', error);
+          });
         }
       }
     }
@@ -912,6 +928,23 @@ export default function VoiceVisualization({
             transition={{ duration: 0.3 }}
           >
             <div className={`w-3 h-3 rounded-full ${isListening ? 'bg-pink-400' : 'bg-white/30'}`} />
+          </motion.div>
+        )}
+
+        {/* iOS Audio Activation Button */}
+        {isMounted && hasStarted && typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && (
+          <motion.div
+            className="fixed top-4 left-4 z-[9999]"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            <button
+              onClick={handleFirstTouch}
+              className="bg-orange-500 hover:bg-orange-600 text-white text-xs px-3 py-2 rounded-lg shadow-lg"
+            >
+              🔧 iOS Audio
+            </button>
           </motion.div>
         )}
       </div>
