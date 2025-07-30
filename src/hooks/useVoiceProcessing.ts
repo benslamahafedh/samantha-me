@@ -23,12 +23,20 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
   const audioStreamRef = useRef<MediaStream | null>(null);
   const isProcessingRef = useRef(false);
   const isSpeakingRef = useRef(false);
+  const stopListeningRef = useRef<(() => void) | null>(null);
 
   const isSupported = typeof window !== 'undefined' && 'MediaRecorder' in window;
 
   // Simple TTS function with iOS audio context activation
   const speak = useCallback(async (text: string) => {
     if (isSpeakingRef.current || !text.trim()) return;
+
+    // Add timeout to prevent infinite loops
+    const speakTimeout = setTimeout(() => {
+      console.warn('TTS timeout - resetting speaking state');
+      setIsSpeaking(false);
+      isSpeakingRef.current = false;
+    }, 30000); // 30 second timeout
 
     try {
       setIsSpeaking(true);
@@ -90,12 +98,14 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
       };
 
       audio.onended = () => {
+        clearTimeout(speakTimeout);
         URL.revokeObjectURL(audioUrl);
         setIsSpeaking(false);
         isSpeakingRef.current = false;
       };
 
       audio.onerror = (error) => {
+        clearTimeout(speakTimeout);
         console.error('Audio error:', error);
         URL.revokeObjectURL(audioUrl);
         setIsSpeaking(false);
@@ -105,6 +115,7 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
       audio.src = audioUrl;
 
     } catch (error) {
+      clearTimeout(speakTimeout);
       console.error('TTS error:', error);
       setIsSpeaking(false);
       isSpeakingRef.current = false;
@@ -113,7 +124,7 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
 
   // Process chat message
   const processChat = useCallback(async (text: string, sessionIdParam?: string) => {
-    if (isProcessingRef.current || !text.trim()) return;
+    if (isProcessingRef.current || isSpeakingRef.current || !text.trim()) return;
 
     const currentSessionId = sessionIdParam || sessionId;
     if (!currentSessionId) {
@@ -143,7 +154,15 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
 
       const data = await response.json();
       
-      if (data.response) {
+      if (data.response && data.response.trim()) {
+        // Stop listening before speaking
+        if (isListening && mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          mediaRecorderRef.current.stop();
+        }
+        
+        // Small delay to ensure listening is stopped
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
         await speak(data.response);
       } else {
         throw new Error('No response from chat API');
@@ -156,7 +175,7 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
       setIsProcessing(false);
       isProcessingRef.current = false;
     }
-  }, [speak, sessionId]);
+  }, [speak, sessionId, isListening]);
 
   // Start listening
   const startListening = useCallback(async () => {
@@ -201,6 +220,13 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
 
         if (duration >= 500 && duration <= 30000) { // Allow longer recordings for manual control
           try {
+            // Prevent multiple simultaneous processing
+            if (isProcessingRef.current || isSpeakingRef.current) {
+              console.log('Already processing or speaking, skipping transcription');
+              cleanupRecording();
+              return;
+            }
+
             const formData = new FormData();
             formData.append('audio', audioBlob, 'recording.webm');
             if (sessionId) {

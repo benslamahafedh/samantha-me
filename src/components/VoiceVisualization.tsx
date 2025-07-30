@@ -683,14 +683,11 @@ export default function VoiceVisualization({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.8, y: 20 }}
             transition={{ duration: 0.3, ease: 'easeOut' }}
-            className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-[9999] pointer-events-auto safari-button"
+            className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-[9999] pointer-events-auto"
             style={{
-              // Safari/iOS-specific positioning
-              ...(typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || /Safari/.test(navigator.userAgent)) && {
-                left: '50%',
-                transform: 'translateX(-50%)',
-                bottom: '5rem'
-              })
+              left: '50%',
+              transform: 'translateX(-50%)',
+              bottom: '5rem'
             }}
           >
             <motion.button
@@ -743,19 +740,16 @@ export default function VoiceVisualization({
         {/* Status Text - responsive - hidden when speaking OR listening */}
         {hasStarted && !isSpeaking && !isListening && !sessionEnded && (
         <motion.div
-          className="text-center mb-4 sm:mb-6 px-4 safari-text"
+          className="text-center mb-4 sm:mb-6 px-4"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.3 }}
           style={{
-            // Safari/iOS-specific positioning
-            ...(typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || /Safari/.test(navigator.userAgent)) && {
-              position: 'relative',
-              zIndex: 10,
-              width: '100%',
-              textAlign: 'center'
-            })
+            position: 'relative',
+            zIndex: 10,
+            width: '100%',
+            textAlign: 'center'
           }}
         >
           <p className={`text-base sm:text-lg font-light ${getStatusColor()}`}>
@@ -886,24 +880,20 @@ export default function VoiceVisualization({
           </div>
         )}
 
-        {/* Footer - responsive with Safari/iOS positioning fix */}
+        {/* Footer - simplified positioning */}
         {!sessionEnded && (
           <motion.div
-            className="fixed bottom-4 sm:bottom-8 left-1/2 transform -translate-x-1/2 px-4 w-full max-w-sm safari-footer"
+            className="fixed bottom-4 sm:bottom-8 left-1/2 transform -translate-x-1/2 px-4 w-full max-w-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.4 }}
             style={{
-              // Safari/iOS-specific positioning
-              ...(typeof window !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || /Safari/.test(navigator.userAgent)) && {
-                bottom: 'env(safe-area-inset-bottom, 1rem)',
-                paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: '100%',
-                maxWidth: '24rem',
-                textAlign: 'center'
-              })
+              left: '50%',
+              transform: 'translateX(-50%)',
+              bottom: '1rem',
+              width: '100%',
+              maxWidth: '24rem',
+              textAlign: 'center'
             }}
           >
             <p className="text-white/40 text-xs sm:text-sm font-light text-center">
