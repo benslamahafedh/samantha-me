@@ -89,7 +89,7 @@ export default function Home() {
   // Show loading state
   if (isLoading) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 flex items-center justify-center">
+      <main className="min-h-screen bg-gradient-to-br from-purple-900 via-pink-900 to-rose-900 flex items-center justify-center">
         <div className="text-center text-white">
           <div className="w-16 h-16 border-4 border-white border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
           <h1 className="text-2xl font-bold mb-2">Initializing Samantha</h1>

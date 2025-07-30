@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 interface VoiceVisualizationProps {
   isListening: boolean;
@@ -119,8 +119,25 @@ export default function VoiceVisualization({
 
   // iOS intro function removed
 
+  // iOS Audio Context Activation on first touch
+  const handleFirstTouch = useCallback(() => {
+    if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioContext) {
+        const audioContext = new AudioContext();
+        if (audioContext.state === 'suspended') {
+          audioContext.resume();
+        }
+      }
+    }
+  }, []);
+
   return (
-    <div className="flex flex-col items-center justify-center h-screen w-screen overflow-hidden p-4 sm:p-8 gradient-rose-pink">
+    <div 
+      className="flex flex-col items-center justify-center h-screen w-screen overflow-hidden p-4 sm:p-8 gradient-rose-pink audio-trigger"
+      onTouchStart={handleFirstTouch}
+      onClick={handleFirstTouch}
+    >
       {/* iOS Audio Activation Overlay removed */}
 
       <div className="relative flex flex-col items-center max-w-2xl w-full">
@@ -852,13 +869,20 @@ export default function VoiceVisualization({
           </div>
         )}
 
-        {/* Footer - responsive */}
+        {/* Footer - responsive with better iOS positioning */}
         {!sessionEnded && (
           <motion.div
-            className="fixed bottom-4 sm:bottom-8 left-1/2 transform -translate-x-1/2 px-4"
+            className="fixed bottom-4 sm:bottom-8 left-1/2 transform -translate-x-1/2 px-4 w-full max-w-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.6, delay: 0.4 }}
+            style={{
+              // iOS-specific positioning
+              ...(typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && {
+                bottom: 'env(safe-area-inset-bottom, 1rem)',
+                paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))'
+              })
+            }}
           >
             <p className="text-white/40 text-xs sm:text-sm font-light text-center">
               {hasStarted ? 'Powered by OMNIAOS • Speak naturally' : 'Powered by OMNIAOS • Voice interface'}

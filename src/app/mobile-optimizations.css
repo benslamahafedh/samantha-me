@@ -160,6 +160,25 @@
   touch-action: manipulation;
 }
 
+/* iOS Audio Context Activation */
+@supports (-webkit-touch-callout: none) {
+  /* iOS audio optimizations */
+  audio {
+    -webkit-playsinline: true;
+    playsinline: true;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  
+  /* Ensure audio context is activated on touch */
+  .audio-trigger {
+    touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
 /* Touch optimizations */
 .touch-optimized {
   touch-action: manipulation;

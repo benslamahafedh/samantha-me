@@ -26,7 +26,7 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
 
   const isSupported = typeof window !== 'undefined' && 'MediaRecorder' in window;
 
-  // Simple TTS function
+  // Simple TTS function with iOS audio context activation
   const speak = useCallback(async (text: string) => {
     if (isSpeakingRef.current || !text.trim()) return;
 
@@ -36,6 +36,18 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
       setError(null);
 
       console.log('Requesting TTS for:', text.substring(0, 50));
+
+      // iOS Audio Context Activation
+      if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        // Create and resume audio context for iOS
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContext) {
+          const audioContext = new AudioContext();
+          if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+          }
+        }
+      }
 
       const response = await fetch('/api/tts-mobile', {
         method: 'POST',
@@ -51,8 +63,30 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio();
 
+      // iOS audio setup
+      audio.preload = 'auto';
+      audio.volume = 1.0;
+      
+      // For iOS, we need to set audio properties before setting src
+      if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+        audio.setAttribute('playsinline', 'true');
+        audio.setAttribute('webkit-playsinline', 'true');
+      }
+
       audio.oncanplay = () => {
-        audio.play().catch(console.error);
+        audio.play().catch((error) => {
+          console.error('Audio play failed:', error);
+          // For iOS, try to resume audio context and play again
+          if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
+            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+            if (AudioContext) {
+              const audioContext = new AudioContext();
+              audioContext.resume().then(() => {
+                audio.play().catch(console.error);
+              });
+            }
+          }
+        });
       };
 
       audio.onended = () => {
@@ -61,7 +95,8 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
         isSpeakingRef.current = false;
       };
 
-      audio.onerror = () => {
+      audio.onerror = (error) => {
+        console.error('Audio error:', error);
         URL.revokeObjectURL(audioUrl);
         setIsSpeaking(false);
         isSpeakingRef.current = false;
