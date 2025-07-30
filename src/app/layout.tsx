@@ -16,19 +16,8 @@ export const metadata: Metadata = {
   keywords: ["voice assistant", "AI", "conversation", "Her", "Samantha"],
   authors: [{ name: "Voice Assistant" }],
   manifest: "/manifest.json",
-  // iOS-specific meta tags for audio
-  other: {
-    "apple-mobile-web-app-capable": "yes",
-    "apple-mobile-web-app-status-bar-style": "black-translucent",
-    "apple-mobile-web-app-title": "Samantha",
-    // Audio session configuration
-    "audio-session-category": "playAndRecord",
-    "audio-session-mode": "voiceChat",
-    "audio-session-options": "defaultToSpeaker,allowBluetooth,allowBluetoothA2DP",
-    // Prevent zoom and scaling issues
-    "viewport-fit": "cover",
-    "format-detection": "telephone=no"
-  },
+  // iOS-specific meta tags removed
+  other: {},
   openGraph: {
     title: "Samantha - Voice Assistant",
     description: "A beautiful voice-only assistant Powered by OMNIAOS",
@@ -68,41 +57,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        {/* iOS-specific early detection and fixes */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                // Detect iOS early
-                var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                
-                if (isIOS) {
-                  console.log('🍎 iOS detected - applying early fixes');
-                  
-                  // Add iOS class to body
-                  document.documentElement.classList.add('ios-device');
-                  
-                  // Prevent iOS Safari from hiding elements
-                  document.addEventListener('DOMContentLoaded', function() {
-                    document.body.style.backgroundColor = '#1f1f1e';
-                    document.body.style.minHeight = '100vh';
-                    document.body.style.overflow = 'hidden';
-                  });
-                  
-                  // Audio context polyfill
-                  if (!window.AudioContext && window.webkitAudioContext) {
-                    window.AudioContext = window.webkitAudioContext;
-                  }
-                  
-                  // Prevent iOS Safari audio issues
-                  document.addEventListener('touchstart', function() {
-                    // This helps prevent audio context suspension
-                  }, { passive: true });
-                }
-              })();
-            `
-          }}
-        />
+        {/* iOS-specific script removed */}
       </head>
       <body className="antialiased" suppressHydrationWarning={true}>
         <ErrorBoundary>

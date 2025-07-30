@@ -115,69 +115,13 @@ export default function VoiceVisualization({
 
   const isActive = isHovering || isTouching;
 
-  // Check if user is on iOS
-  const isIOS = typeof window !== 'undefined' && typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  // iOS logic removed
 
-  // Show iOS audio instructions
-  const [showIOSInstructions, setShowIOSInstructions] = useState(false);
-
-  useEffect(() => {
-    if (isIOS && isReady && !hasStarted) {
-      // Show iOS instructions after a delay
-      const timer = setTimeout(() => {
-        setShowIOSInstructions(true);
-      }, 2000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isIOS, isReady, hasStarted]);
-  const needsIOSAudioActivation = isIOS && !hasStarted && isReady;
-
-  // iOS-optimized intro - much simpler to prevent black screens
-  const renderIOSIntro = () => (
-    <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.5 }}
-    >
-      <div className="absolute inset-0 bg-black/80" />
-      <motion.div
-        className="relative text-center"
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.8, opacity: 0 }}
-        transition={{ duration: 0.8, ease: 'easeOut' }}
-      >
-        <div className="text-6xl mb-6 animate-pulse">✨</div>
-        <h1 className="text-3xl font-light text-white mb-4">
-          Samantha
-        </h1>
-        <p className="text-lg text-gray-300">
-          Your AI companion
-        </p>
-      </motion.div>
-    </motion.div>
-  );
+  // iOS intro function removed
 
   return (
     <div className="flex flex-col items-center justify-center h-screen w-screen overflow-hidden p-4 sm:p-8 gradient-rose-pink">
-      {/* iOS Audio Activation Overlay */}
-      {needsIOSAudioActivation && (
-        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="text-center text-white p-6 max-w-sm">
-            <div className="text-4xl mb-4 animate-pulse">🍎</div>
-            <h3 className="text-xl font-medium mb-2">iOS Audio Setup</h3>
-            <p className="text-sm text-gray-300 mb-4">
-              Tap anywhere to activate audio and start your conversation with Samantha
-            </p>
-            <div className="text-xs text-gray-400">
-              This is required for iOS devices to enable microphone access
-            </div>
-          </div>
-        </div>
-      )}
+      {/* iOS Audio Activation Overlay removed */}
 
       <div className="relative flex flex-col items-center max-w-2xl w-full">
         
@@ -936,52 +880,7 @@ export default function VoiceVisualization({
         )}
       </div>
 
-      {/* iOS Audio Instructions */}
-      {showIOSInstructions && isIOS && (
-        <motion.div
-          className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-        >
-          <div className="bg-black/80 backdrop-blur-sm rounded-2xl p-6 max-w-sm mx-4 border border-white/20">
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <h3 className="text-white font-semibold">iPhone Audio Setup</h3>
-            </div>
-            
-            <p className="text-white/80 text-sm mb-4">
-              To use Samantha on your iPhone, please ensure audio is enabled:
-            </p>
-            
-            <div className="space-y-2 text-sm text-white/70">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span>Turn off silent mode (flip the switch on the side)</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span>Allow microphone access when prompted</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                <span>Ensure volume is turned up</span>
-              </div>
-            </div>
-            
-            <button
-              onClick={() => setShowIOSInstructions(false)}
-              className="mt-4 w-full bg-white/20 text-white py-2 rounded-lg hover:bg-white/30 transition-colors text-sm"
-            >
-              Got it
-            </button>
-          </div>
-        </motion.div>
-      )}
+      {/* iOS Audio Instructions removed */}
     </div>
   );
 } 

@@ -17,7 +17,7 @@ export default function VoiceErrorDisplay({
 }: VoiceErrorDisplayProps) {
   if (!error) return null;
 
-  const isIOS = typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+  // iOS detection removed
   const isMicrophoneError = error.includes('microphone') || error.includes('Microphone');
   const isAudioError = error.includes('audio') || error.includes('Audio');
 
@@ -32,27 +32,14 @@ export default function VoiceErrorDisplay({
           </div>
           
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            {isIOS ? 'iOS Audio Issue' : 'Voice Error'}
+            Voice Error
           </h3>
           
           <p className="text-gray-600 mb-6">
             {error}
           </p>
 
-          {isIOS && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
-              <h4 className="font-medium text-blue-900 mb-2">iOS Troubleshooting:</h4>
-              <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Make sure your device is not on silent mode</li>
-                <li>• Use Safari browser (not Chrome/Firefox)</li>
-                <li>• Go to Settings → Safari → Microphone → Allow</li>
-                <li>• Try refreshing the page</li>
-                <li>• Check that media volume is turned up</li>
-                <li>• Tap the screen to retry audio initialization</li>
-                <li>• Close Safari completely and reopen</li>
-              </ul>
-            </div>
-          )}
+          {/* iOS troubleshooting section removed */}
 
           {isMicrophoneError && onRequestPermission && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
@@ -73,14 +60,7 @@ export default function VoiceErrorDisplay({
               </button>
             )}
             
-            {isIOS && (
-              <button
-                onClick={onRetry}
-                className="flex-1 bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition-colors"
-              >
-                Retry iOS Audio
-              </button>
-            )}
+            {/* iOS retry button removed */}
             
             <button
               onClick={onRetry}
@@ -97,14 +77,7 @@ export default function VoiceErrorDisplay({
             </button>
           </div>
 
-          {isIOS && (
-            <div className="mt-4 text-xs text-gray-500">
-              <p>If the issue persists, try:</p>
-              <p>1. Closing Safari completely and reopening</p>
-              <p>2. Restarting your device</p>
-              <p>3. Checking for iOS updates</p>
-            </div>
-          )}
+          {/* iOS troubleshooting footer removed */}
         </div>
       </div>
     </div>
