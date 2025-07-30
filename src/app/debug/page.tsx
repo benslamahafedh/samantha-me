@@ -198,7 +198,7 @@ export default function DebugPage() {
                 </button>
               </div>
             </div>
-          </div>
+        </div>
 
           {/* Logs */}
           <div className="bg-white rounded-lg shadow-lg p-6">

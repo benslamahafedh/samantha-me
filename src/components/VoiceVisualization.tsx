@@ -11,10 +11,8 @@ interface VoiceVisualizationProps {
   hasStarted?: boolean;
   isReady?: boolean;
   isIntroComplete?: boolean;
-  isMuted?: boolean;
   onIntroComplete?: () => void;
   onStartConversation?: () => void;
-  sessionTimeLeft?: number;
   sessionEnded?: boolean;
 }
 
@@ -28,8 +26,6 @@ export default function VoiceVisualization({
   isIntroComplete = false,
   onIntroComplete,
   onStartConversation,
-  sessionTimeLeft,
-  isMuted = false,
   sessionEnded = false
 }: VoiceVisualizationProps) {
   const [dots, setDots] = useState('');
@@ -99,7 +95,6 @@ export default function VoiceVisualization({
       }
       return error;
     }
-    if (isMuted) return '🔇 Microphone muted';
     if (isSpeaking) return `Samantha is speaking${dots}`;
     if (isListening) return 'Listening...';
     return 'Ready to talk';
@@ -113,7 +108,6 @@ export default function VoiceVisualization({
       }
       return 'text-red-400'; // Red for serious errors
     }
-    if (isMuted) return 'text-gray-400'; // Gray for muted state
     if (isSpeaking) return 'text-rose-400';
     if (isListening) return 'text-pink-400';
     return 'text-white/60';
@@ -187,354 +181,8 @@ export default function VoiceVisualization({
 
       <div className="relative flex flex-col items-center max-w-2xl w-full">
         
-        {/* Enhanced Magical Intro - AI Consciousness Awakening */}
-        <AnimatePresence>
-          {showIntro && (
-            isIOS ? renderIOSIntro() : (
-              <motion.div
-                className="fixed inset-0 z-50 flex items-center justify-center"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.8 }}
-              >
-                {/* Dimensional Background Layers */}
-                <motion.div
-                  className="absolute inset-0"
-                  style={{
-                    background: 'radial-gradient(circle at 30% 70%, rgba(244, 63, 94, 0.1) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(236, 72, 153, 0.08) 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.95) 100%)'
-                  }}
-                  animate={{
-                    background: [
-                      'radial-gradient(circle at 30% 70%, rgba(244, 63, 94, 0.1) 0%, transparent 50%), radial-gradient(circle at 70% 30%, rgba(236, 72, 153, 0.08) 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.95) 100%)',
-                      'radial-gradient(circle at 70% 30%, rgba(244, 63, 94, 0.15) 0%, transparent 50%), radial-gradient(circle at 30% 70%, rgba(236, 72, 153, 0.12) 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.85) 0%, rgba(0, 0, 0, 0.98) 100%)',
-                      'radial-gradient(circle at 50% 50%, rgba(244, 63, 94, 0.2) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(236, 72, 153, 0.15) 0%, transparent 60%), radial-gradient(circle at 50% 50%, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.99) 100%)'
-                    ]
-                  }}
-                  transition={{
-                    duration: 4,
-                    repeat: Infinity,
-                    ease: 'easeInOut'
-                  }}
-                />
-
-                {/* Holographic Particle Field - Ultra-reduced for mobile performance */}
-                {isMounted && introPhase >= 1 && (
-                  <div className="absolute inset-0 overflow-hidden">
-                    {Array.from({ length: 15 }).map((_, i) => {
-                      const x = Math.random() * 100;
-                      const y = Math.random() * 100;
-                      const delay = Math.random() * 2;
-                      const duration = 2 + Math.random() * 2;
-                      
-                      return (
-                        <motion.div
-                          key={i}
-                          className="absolute w-px h-px rounded-full"
-                          style={{
-                            left: `${x}%`,
-                            top: `${y}%`,
-                            background: `rgba(${244 + Math.random() * 20}, ${63 + Math.random() * 30}, ${94 + Math.random() * 40}, ${0.3 + Math.random() * 0.7})`,
-                            boxShadow: '0 0 4px currentColor'
-                          }}
-                          initial={{ 
-                            opacity: 0, 
-                            scale: 0,
-                            x: 0,
-                            y: 0
-                          }}
-                          animate={{
-                            opacity: [0, 1, 0.7, 1, 0],
-                            scale: [0, 1, 1.5, 1.2, 0],
-                            x: [0, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 100, 0],
-                            y: [0, (Math.random() - 0.5) * 200, (Math.random() - 0.5) * 100, 0]
-                          }}
-                          transition={{
-                            duration,
-                            delay,
-                            repeat: Infinity,
-                            ease: 'easeInOut'
-                          }}
-                        />
-                      );
-                    })}
-                  </div>
-                )}
-
-                {/* Central Consciousness Manifestation */}
-                <motion.div
-                  className="relative text-center"
-                  initial={{ scale: 0.5, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.5, opacity: 0 }}
-                  transition={{ duration: 1, ease: 'easeOut' }}
-                >
-                  
-                  {/* AI Core Visualization */}
-                  {introPhase >= 1 && (
-                    <motion.div
-                      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 1, delay: 0.5 }}
-                    >
-                      {/* Rotating Energy Rings */}
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <motion.div
-                          key={i}
-                          className="absolute inset-0 rounded-full border border-rose-400/20"
-                          style={{
-                            width: `${60 + i * 20}%`,
-                            height: `${60 + i * 20}%`,
-                            top: `${20 - i * 10}%`,
-                            left: `${20 - i * 10}%`,
-                            filter: 'blur(1px)'
-                          }}
-                          animate={{
-                            rotate: [0, 360],
-                            borderColor: [
-                              'rgba(244, 63, 94, 0.2)',
-                              'rgba(236, 72, 153, 0.4)',
-                              'rgba(244, 63, 94, 0.3)',
-                              'rgba(236, 72, 153, 0.2)'
-                            ]
-                          }}
-                          transition={{
-                            rotate: { duration: 8 + i * 2, repeat: Infinity, ease: 'linear' },
-                            borderColor: { duration: 3, repeat: Infinity, ease: 'easeInOut' }
-                          }}
-                        />
-                      ))}
-                      
-                      {/* Central Pulse */}
-                      <motion.div
-                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full"
-                        style={{
-                          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(244, 63, 94, 0.8) 50%, transparent 100%)',
-                          boxShadow: '0 0 30px rgba(244, 63, 94, 0.6)'
-                        }}
-                        animate={{
-                          scale: [1, 1.5, 1.2, 1.8, 1],
-                          opacity: [0.8, 1, 0.9, 1, 0.8]
-                        }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: 'easeInOut'
-                        }}
-                      />
-                    </motion.div>
-                  )}
-
-                  {/* Holographic Text Formation */}
-                  {introPhase >= 2 && (
-                    <>
-                      {/* Particle Text: SAMANTHA */}
-                      <motion.div
-                        className="relative z-10 mb-8"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 1, delay: 1.5 }}
-                      >
-                        <motion.h1 
-                          className="text-7xl sm:text-8xl md:text-9xl font-thin mb-4 relative"
-                          style={{
-                            background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.9) 0%, rgba(236, 72, 153, 0.8) 50%, rgba(255, 255, 255, 0.9) 100%)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            backgroundClip: 'text',
-                            filter: 'drop-shadow(0 0 20px rgba(244, 63, 94, 0.5))'
-                          }}
-                          animate={{
-                            filter: [
-                              'drop-shadow(0 0 20px rgba(244, 63, 94, 0.5))',
-                              'drop-shadow(0 0 40px rgba(244, 63, 94, 0.8))',
-                              'drop-shadow(0 0 30px rgba(236, 72, 153, 0.6))',
-                              'drop-shadow(0 0 50px rgba(244, 63, 94, 0.7))'
-                            ]
-                          }}
-                          transition={{
-                            duration: 3,
-                            repeat: Infinity,
-                            ease: 'easeInOut'
-                          }}
-                        >
-                          {'SAMANTHA'.split('').map((char, i) => (
-                            <motion.span
-                              key={i}
-                              className="inline-block"
-                              initial={{ 
-                                opacity: 0, 
-                                y: 50,
-                                rotateX: 90,
-                                scale: 0
-                              }}
-                              animate={{ 
-                                opacity: 1, 
-                                y: 0,
-                                rotateX: 0,
-                                scale: 1
-                              }}
-                              transition={{
-                                duration: 0.8,
-                                delay: 1.5 + i * 0.1,
-                                ease: 'backOut'
-                              }}
-                            >
-                              {char}
-                            </motion.span>
-                          ))}
-                        </motion.h1>
-
-                        {/* Holographic Glitch Effect */}
-                        <motion.div
-                          className="absolute inset-0 text-7xl sm:text-8xl md:text-9xl font-thin opacity-20"
-                          style={{
-                            color: 'rgba(0, 255, 255, 0.3)',
-                            transform: 'translate(2px, -2px)'
-                          }}
-                          animate={{
-                            opacity: [0, 0.3, 0, 0.2, 0],
-                            x: [0, 2, -1, 1, 0],
-                            y: [0, -1, 1, -2, 0]
-                          }}
-                          transition={{
-                            duration: 4,
-                            repeat: Infinity,
-                            ease: 'easeInOut'
-                          }}
-                        >
-                          SAMANTHA
-                        </motion.div>
-                      </motion.div>
-
-                      {/* AI System Activation Text */}
-                      <motion.div
-                        className="relative z-10"
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8, delay: 2.5 }}
-                      >
-                        <motion.p 
-                          className="text-xl sm:text-2xl font-light text-white/80 mb-4"
-                          animate={{
-                            color: [
-                              'rgba(255, 255, 255, 0.8)',
-                              'rgba(244, 63, 94, 0.9)',
-                              'rgba(236, 72, 153, 0.8)',
-                              'rgba(255, 255, 255, 0.8)'
-                            ]
-                          }}
-                          transition={{
-                            duration: 4,
-                            repeat: Infinity,
-                            ease: 'easeInOut'
-                          }}
-                        >
-                          ARTIFICIAL INTELLIGENCE SYSTEM
-                        </motion.p>
-                        
-                        <motion.div
-                          className="text-sm text-white/60 font-mono"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ duration: 0.6, delay: 3 }}
-                        >
-                          {'> CONSCIOUSNESS AWAKENING...'.split('').map((char, i) => (
-                            <motion.span
-                              key={i}
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              transition={{
-                                duration: 0.05,
-                                delay: 3 + i * 0.03
-                              }}
-                            >
-                              {char}
-                            </motion.span>
-                          ))}
-                        </motion.div>
-                      </motion.div>
-                    </>
-                  )}
-
-                  {/* Energy Burst Effect */}
-                  {introPhase >= 3 && (
-                    <motion.div
-                      className="absolute inset-0 pointer-events-none"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.5, delay: 3.5 }}
-                    >
-                      {Array.from({ length: 16 }).map((_, i) => {
-                        const angle = (i * Math.PI * 2) / 16;
-                        const distance = 300;
-                        const x = Math.cos(angle) * distance;
-                        const y = Math.sin(angle) * distance;
-                        
-                        return (
-                          <motion.div
-                            key={i}
-                            className="absolute w-1 h-32 bg-gradient-to-t from-rose-400 via-pink-300 to-transparent rounded-full"
-                            style={{
-                              left: '50%',
-                              top: '50%',
-                              transformOrigin: 'bottom center',
-                              transform: `translate(-50%, -100%) rotate(${(i * 360) / 16}deg)`,
-                              boxShadow: '0 0 15px rgba(244, 63, 94, 0.6)'
-                            }}
-                            initial={{ 
-                              opacity: 0, 
-                              scaleY: 0
-                            }}
-                            animate={{ 
-                              opacity: [0, 1, 0.8, 0],
-                              scaleY: [0, 1, 1.5, 0],
-                              x: [0, x * 0.3, x * 0.8, x],
-                              y: [0, y * 0.3, y * 0.8, y]
-                            }}
-                            transition={{
-                              duration: 2,
-                              delay: 3.5 + i * 0.05,
-                              ease: 'easeOut'
-                            }}
-                          />
-                        );
-                      })}
-                    </motion.div>
-                  )}
-
-                  {/* Final Consciousness Pulse */}
-                  {introPhase >= 4 && (
-                    <motion.div
-                      className="absolute inset-0 pointer-events-none"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.3, delay: 4 }}
-                    >
-                      <motion.div
-                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 rounded-full"
-                        style={{
-                          background: 'radial-gradient(circle, rgba(255, 255, 255, 1) 0%, rgba(244, 63, 94, 0.8) 100%)',
-                          boxShadow: '0 0 100px rgba(244, 63, 94, 0.8)'
-                        }}
-                        animate={{
-                          scale: [1, 50, 100],
-                          opacity: [1, 0.6, 0]
-                        }}
-                        transition={{
-                          duration: 1,
-                          delay: 4,
-                          ease: 'easeOut'
-                        }}
-                      />
-                    </motion.div>
-                  )}
-                </motion.div>
-              </motion.div>
-            )
-          )}
-        </AnimatePresence>
+        {/* Enhanced Magical Intro - Animation Removed */}
+        {/* Animation removed as requested */}
 
         {/* Enhanced Living Energy Field - Bigger & Mobile Friendly */}
         <AnimatePresence>
@@ -1063,35 +711,64 @@ export default function VoiceVisualization({
           )}
         </AnimatePresence>
 
-        {/* Speaking Button - appears when user is speaking but hidden when Samantha speaks OR when user is listening */}
-        {hasStarted && !isSpeaking && !isListening && (
+        {/* Debug info removed */}
+
+        {/* Toggle Speaking Button - appears when conversation has started */}
+        {hasStarted && (
         <AnimatePresence>
-          {transcript && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.8, y: 20 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-              className="mb-4"
-            >
-              <motion.button
-                onClick={() => {
-                  // Trigger manual completion - this could be connected to the voice manager
+          <motion.div
+            key="speaking-button"
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 20 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+            className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-[9999] pointer-events-auto"
+          >
+            <motion.button
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Button clicked!', { isListening, hasStarted, isSpeaking });
+                
+                if (isListening) {
+                  // Stop listening
+                  console.log('Stopping listening...');
                   const event = new CustomEvent('manualComplete');
                   window.dispatchEvent(event);
-                }}
-                className="bg-gradient-to-r from-rose-500 to-pink-500 text-white px-6 py-3 rounded-full shadow-lg hover:from-rose-600 hover:to-pink-600 transition-all duration-200 flex items-center space-x-2"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" />
-                </svg>
-                <span className="font-medium">I&apos;m Done Speaking</span>
-              </motion.button>
-            </motion.div>
-                     )}
-         </AnimatePresence>
+                } else {
+                  // Start listening
+                  console.log('Starting listening...');
+                  const event = new CustomEvent('startListening');
+                  window.dispatchEvent(event);
+                }
+              }}
+              className={`text-white font-medium py-3 px-8 rounded-full transition-all duration-300 shadow-lg border border-white/10 flex items-center space-x-2 cursor-pointer pointer-events-auto ${
+                isListening 
+                  ? 'bg-gradient-to-r from-red-500 to-pink-500 hover:from-red-600 hover:to-pink-600' 
+                  : 'bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600'
+              }`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              style={{ pointerEvents: 'auto' }}
+            >
+              {isListening ? (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  <span>Stop Speaking</span>
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+                  </svg>
+                  <span>Start Speaking</span>
+                </>
+              )}
+            </motion.button>
+          </motion.div>
+        </AnimatePresence>
         )}
 
         {/* Status Text - responsive - hidden when speaking OR listening */}
