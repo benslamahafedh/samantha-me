@@ -24,31 +24,12 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
   const isProcessingRef = useRef(false);
   const isSpeakingRef = useRef(false);
   const stopListeningRef = useRef<(() => void) | null>(null);
-  const globalAudioContextRef = useRef<AudioContext | null>(null);
 
   const isSupported = typeof window !== 'undefined' && 'MediaRecorder' in window;
 
-  // Initialize global audio context for iOS
-  useEffect(() => {
-    if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (AudioContextClass && !globalAudioContextRef.current) {
-        globalAudioContextRef.current = new AudioContextClass();
-        console.log('Global audio context created for iOS');
-      }
-    }
-  }, []);
-
-  // Enhanced TTS function with robust iOS audio support
+  // Simple and reliable TTS function
   const speak = useCallback(async (text: string) => {
     if (isSpeakingRef.current || !text.trim()) return;
-
-    // Add timeout to prevent infinite loops
-    const speakTimeout = setTimeout(() => {
-      console.warn('TTS timeout - resetting speaking state');
-      setIsSpeaking(false);
-      isSpeakingRef.current = false;
-    }, 30000); // 30 second timeout
 
     try {
       setIsSpeaking(true);
@@ -56,28 +37,6 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
       setError(null);
 
       console.log('Requesting TTS for:', text.substring(0, 50));
-
-      // Enhanced iOS Audio Context Activation
-      let audioContext: AudioContext | null = null;
-      if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
-        console.log('iOS detected - using global audio context');
-        audioContext = globalAudioContextRef.current;
-        
-        if (!audioContext) {
-          const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-          if (AudioContextClass) {
-            audioContext = new AudioContextClass();
-            globalAudioContextRef.current = audioContext;
-            console.log('Created new audio context for iOS');
-          }
-        }
-        
-        if (audioContext && audioContext.state === 'suspended') {
-          console.log('Resuming suspended audio context');
-          await audioContext.resume();
-        }
-        console.log('Audio context state:', audioContext?.state);
-      }
 
       const response = await fetch('/api/tts-mobile', {
         method: 'POST',
@@ -93,87 +52,40 @@ export function useVoiceProcessing(sessionId?: string): VoiceProcessingReturn {
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio();
 
-      // Enhanced iOS audio setup
-      audio.preload = 'auto';
+      // Simple audio setup
       audio.volume = 1.0;
       audio.muted = false;
       
-      // iOS-specific audio attributes
+      // iOS-specific attributes
       if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
         audio.setAttribute('playsinline', 'true');
         audio.setAttribute('webkit-playsinline', 'true');
-        audio.setAttribute('controls', 'false');
-        audio.setAttribute('autoplay', 'false');
-        console.log('iOS audio attributes set');
       }
 
-      // Enhanced audio event handlers
+      // Simple event handlers
       audio.oncanplay = () => {
-        console.log('Audio can play - attempting to play');
         audio.play().catch((error) => {
           console.error('Audio play failed:', error);
-          
-          // Enhanced iOS retry logic
-          if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
-            console.log('iOS audio play failed - attempting retry');
-            
-            // Try to resume audio context first
-            if (audioContext && audioContext.state === 'suspended') {
-              audioContext.resume().then(() => {
-                console.log('Audio context resumed, retrying play');
-                audio.play().catch((retryError) => {
-                  console.error('iOS audio retry failed:', retryError);
-                  clearTimeout(speakTimeout);
-                  setIsSpeaking(false);
-                  isSpeakingRef.current = false;
-                });
-              });
-            } else {
-              // Try playing with a small delay
-              setTimeout(() => {
-                audio.play().catch((retryError) => {
-                  console.error('iOS audio delayed retry failed:', retryError);
-                  clearTimeout(speakTimeout);
-                  setIsSpeaking(false);
-                  isSpeakingRef.current = false;
-                });
-              }, 100);
-            }
-          } else {
-            clearTimeout(speakTimeout);
-            setIsSpeaking(false);
-            isSpeakingRef.current = false;
-          }
+          setIsSpeaking(false);
+          isSpeakingRef.current = false;
         });
       };
 
-      audio.onloadstart = () => console.log('Audio loading started');
-      audio.onloadedmetadata = () => console.log('Audio metadata loaded');
-      audio.onloadeddata = () => console.log('Audio data loaded');
-      audio.oncanplaythrough = () => console.log('Audio can play through');
-
       audio.onended = () => {
-        console.log('Audio playback ended');
-        clearTimeout(speakTimeout);
         URL.revokeObjectURL(audioUrl);
         setIsSpeaking(false);
         isSpeakingRef.current = false;
       };
 
-      audio.onerror = (error) => {
-        clearTimeout(speakTimeout);
-        console.error('Audio error:', error);
-        console.error('Audio error details:', audio.error);
+      audio.onerror = () => {
         URL.revokeObjectURL(audioUrl);
         setIsSpeaking(false);
         isSpeakingRef.current = false;
       };
 
-      // Set audio source
       audio.src = audioUrl;
 
     } catch (error) {
-      clearTimeout(speakTimeout);
       console.error('TTS error:', error);
       setIsSpeaking(false);
       isSpeakingRef.current = false;

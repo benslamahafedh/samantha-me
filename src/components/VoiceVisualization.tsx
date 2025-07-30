@@ -119,30 +119,15 @@ export default function VoiceVisualization({
 
   // iOS intro function removed
 
-  // iOS Audio Context Activation on first touch
+  // Simple iOS audio activation
   const handleFirstTouch = useCallback(() => {
     if (typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)) {
-      console.log('iOS touch detected - activating audio context');
-      
-      // Create a silent audio element to trigger user interaction
-      const silentAudio = new Audio();
-      silentAudio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
-      silentAudio.volume = 0;
-      silentAudio.play().catch(() => {
-        console.log('Silent audio play failed - this is expected');
-      });
-      
-      // Also try to resume any existing audio context
+      // Simple audio context activation
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       if (AudioContext) {
-        // Try to get existing audio context or create new one
         const audioContext = new AudioContext();
         if (audioContext.state === 'suspended') {
-          audioContext.resume().then(() => {
-            console.log('iOS audio context resumed successfully');
-          }).catch((error) => {
-            console.error('Failed to resume audio context:', error);
-          });
+          audioContext.resume();
         }
       }
     }
